@@ -74,41 +74,39 @@ func NewRenderer() (*Renderer, error) {
 }
 
 func (r Renderer) Render(logic Logic) webhelp.Handler {
-	return webhelp.HandlerFunc(func(ctx context.Context, w webhelp.ResponseWriter,
-		req *http.Request) error {
-		if req.Method != "GET" {
-			return webhelp.ErrMethodNotAllowed.New("invalid method %#v", req.Method)
-		}
-		user, err := LoadUser(ctx)
-		if err != nil {
-			return err
-		}
-		tmpl, page, err := logic(ctx, req, user)
-		if err != nil {
-			return err
-		}
-		t := r.Templates.Lookup(tmpl)
-		if t == nil {
-			return webhelp.ErrInternalServerError.New("no template %#v registered", tmpl)
-		}
-		w.Header().Set("Content-Type", "text/html")
-		return t.Execute(w, PageCtx{
-			User:      user,
-			LogoutURL: oauth2.LogoutURL("/"),
-			Page:      page})
-	})
+	return webhelp.Exact(webhelp.HandlerFunc(
+		func(ctx context.Context, w webhelp.ResponseWriter,
+			req *http.Request) error {
+			user, err := LoadUser(ctx)
+			if err != nil {
+				return err
+			}
+			tmpl, page, err := logic(ctx, req, user)
+			if err != nil {
+				return err
+			}
+			t := r.Templates.Lookup(tmpl)
+			if t == nil {
+				return webhelp.ErrInternalServerError.New("no template %#v registered", tmpl)
+			}
+			w.Header().Set("Content-Type", "text/html")
+			return t.Execute(w, PageCtx{
+				User:      user,
+				LogoutURL: oauth2.LogoutURL("/"),
+				Page:      page})
+		}))
 }
 
 type Handler func(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo) error
 
 func (r Renderer) Process(logic Handler) webhelp.Handler {
-	return webhelp.HandlerFunc(func(ctx context.Context, w webhelp.ResponseWriter,
-		req *http.Request) error {
+	return webhelp.ExactPath(webhelp.HandlerFunc(func(ctx context.Context,
+		w webhelp.ResponseWriter, req *http.Request) error {
 		user, err := LoadUser(ctx)
 		if err != nil {
 			return err
 		}
 		return logic(ctx, w, req, user)
-	})
+	}))
 }

@@ -42,15 +42,16 @@ func main() {
 
 	routes := webhelp.LoggingHandler(
 		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
-			webhelp.DirMux{
-				"": oauth2.LoginRequired(renderer.Render(app.ProjectList)),
+			webhelp.OverlayMux{Fallback: oauth2.LoginRequired(webhelp.DirMux{
+				"": renderer.Render(app.ProjectList),
 				"project": projectId.ShiftIf(webhelp.MethodMux{
 					"GET": renderer.Render(app.Project),
 				}, webhelp.ExactPath(webhelp.MethodMux{
 					"GET":  webhelp.RedirectHandler("/"),
 					"POST": renderer.Process(app.NewProject),
-				})),
-				"auth": oauth2}))
+				}))}),
+				Overlay: webhelp.DirMux{
+					"auth": oauth2}}))
 
 	switch flag.Arg(0) {
 	case "migrate":
