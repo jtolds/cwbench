@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/jinzhu/gorm"
 	"github.com/jtolds/webhelp"
@@ -24,7 +23,7 @@ var (
 		"the secret for securing cookie information")
 	sqlitePath = flag.String("db", "./db.db", "")
 
-	projectId = webhelp.NewArgMux()
+	projectId = webhelp.NewIntArgMux()
 )
 
 // data model:
@@ -72,14 +71,9 @@ func (a *App) ProjectList(ctx context.Context, req *http.Request,
 }
 
 func (a *App) Project(ctx context.Context, req *http.Request,
-	user *UserInfo) (tmpl string, page map[string]interface{},
-	err error) {
-	id, err := strconv.Atoi(projectId.Get(ctx))
-	if err != nil {
-		return "", nil, webhelp.ErrNotFound.New("")
-	}
+	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
 	var proj Project
-	err = a.db.First(&proj, id).Error
+	err = a.db.First(&proj, projectId.Get(ctx)).Error
 	if err != nil {
 		return "", nil, err
 	}
@@ -137,10 +131,10 @@ func main() {
 					"project": projectId.ShiftIf(webhelp.MethodMux{
 						"GET":  renderer.Render(app.Project),
 						"POST": renderer.Process(app.UpdateProject),
-					}, webhelp.MethodMux{
+					}, webhelp.ExactPath(webhelp.MethodMux{
 						"GET":  webhelp.RedirectHandler("/"),
 						"POST": renderer.Process(app.NewProject),
-					}),
+					})),
 					"auth": oauth2}))))
 	default:
 		fmt.Printf("Usage: %s <serve|migrate>\n", os.Args[0])
