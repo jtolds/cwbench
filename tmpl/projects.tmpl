@@ -1,0 +1,17 @@
+{{ template "header" . }}
+
+<h1>Your Projects</h1>
+<ul>
+{{ range .Page.Projects }}
+<li><a href="/project/{{.ID}}">{{.Name}}</a></li>
+{{ end }}
+
+<li>
+  <form method="POST" action="/project/">
+  <input type="text" name="name" />
+  <input type="submit" value="Create" />
+  </form>
+</li>
+</ul>
+
+{{ template "footer" . }}
