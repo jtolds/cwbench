@@ -1,6 +1,7 @@
 {{ template "header" . }}
 
-<h1>Project {{.Page.Project.Name}}</h1>
+<h1>Project: {{.Page.Project.Name}}</h1>
 <p>Created at <i>{{.Page.Project.CreatedAt}}</i></p>
+<p>Project is associated with {{ (len .Page.Dimensions) }} dimensions.</p>
 
 {{ template "footer" . }}
