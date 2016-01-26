@@ -85,8 +85,3 @@ func (a *App) NewProject(ctx context.Context, w webhelp.ResponseWriter,
 	tx.Commit()
 	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d", proj.Id))
 }
-
-func (a *App) UpdateProject(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo) error {
-	return webhelp.Redirect(w, req, req.RequestURI)
-}

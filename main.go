@@ -40,6 +40,18 @@ func main() {
 	}
 	defer app.Close()
 
+	routes := webhelp.LoggingHandler(
+		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
+			webhelp.DirMux{
+				"": oauth2.LoginRequired(renderer.Render(app.ProjectList)),
+				"project": projectId.ShiftIf(webhelp.MethodMux{
+					"GET": renderer.Render(app.Project),
+				}, webhelp.ExactPath(webhelp.MethodMux{
+					"GET":  webhelp.RedirectHandler("/"),
+					"POST": renderer.Process(app.NewProject),
+				})),
+				"auth": oauth2}))
+
 	switch flag.Arg(0) {
 	case "migrate":
 		err := app.Migrate()
@@ -47,18 +59,9 @@ func main() {
 			panic(err)
 		}
 	case "serve":
-		panic(webhelp.ListenAndServe(*listenAddr, webhelp.LoggingHandler(
-			sessions.HandlerWithStore(sessions.NewCookieStore(secret),
-				webhelp.DirMux{
-					"": oauth2.LoginRequired(renderer.Render(app.ProjectList)),
-					"project": projectId.ShiftIf(webhelp.MethodMux{
-						"GET":  renderer.Render(app.Project),
-						"POST": renderer.Process(app.UpdateProject),
-					}, webhelp.ExactPath(webhelp.MethodMux{
-						"GET":  webhelp.RedirectHandler("/"),
-						"POST": renderer.Process(app.NewProject),
-					})),
-					"auth": oauth2}))))
+		panic(webhelp.ListenAndServe(*listenAddr, routes))
+	case "routes":
+		webhelp.PrintRoutes(os.Stdout, routes)
 	default:
 		fmt.Printf("Usage: %s <serve|migrate>\n", os.Args[0])
 	}
