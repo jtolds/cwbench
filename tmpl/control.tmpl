@@ -1,0 +1,33 @@
+{{ template "header" . }}
+
+<h1>Project: {{.Page.Project.Name}}</h1>
+<h2>Control: {{.Page.Control.Name}}</h2>
+<p>Created at <i>{{.Page.Control.CreatedAt}}</i></p>
+
+<ul>
+{{ $lookup := .Page.Lookup }}
+{{ range .Page.Values }}
+<li>{{(index $lookup .DimensionId)}} - {{.Rank}}</li>
+{{ end }}
+</ul>
+
+
+
+<h2>Samples</h2>
+<ul>
+{{ $page := .Page }}
+{{ range .Page.Samples }}
+<li><a href="/project/{{$page.Project.Id}}/control/{{$page.Control.Id}}/sample/{{.Id}}">{{.Name}}</a></li>
+{{ end }}
+
+<br/>
+<li>
+  <form method="POST" action="/project/{{.Page.Project.Id}}/control/{{.Page.Control.Id}}/sample">
+  <input type="text" name="name" /><br/>
+  <textarea name="values"></textarea>
+  <input type="submit" value="Upload" />
+  </form>
+</li>
+</ul>
+
+{{ template "footer" . }}

@@ -6,10 +6,11 @@
 <li><a href="/project/{{.Id}}">{{.Name}}</a></li>
 {{ end }}
 
+<br/>
 <li>
   <form method="POST" action="/project/">
   <input type="text" name="name" /><br/>
-  <textarea name="dimensions"></textarea><br/>
+  <textarea name="dimensions"></textarea>
   <input type="submit" value="Create" />
   </form>
 </li>

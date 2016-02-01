@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -110,3 +111,15 @@ func (r Renderer) Process(logic Handler) webhelp.Handler {
 		return logic(ctx, w, req, user)
 	}))
 }
+
+var (
+	ProjectRedirector = webhelp.RedirectHandlerFunc(
+		func(ctx context.Context, r *http.Request) string {
+			return fmt.Sprintf("/project/%d", projectId.Get(ctx))
+		})
+	ControlRedirector = webhelp.RedirectHandlerFunc(
+		func(ctx context.Context, r *http.Request) string {
+			return fmt.Sprintf("/project/%d/control/%d",
+				projectId.Get(ctx), controlId.Get(ctx))
+		})
+)

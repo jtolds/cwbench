@@ -1,0 +1,14 @@
+{{ template "header" . }}
+
+<h1>Project: {{.Page.Project.Name}}</h1>
+<h2>Differential expression: {{.Page.DiffExp.Name}}</h2>
+<p>Created at <i>{{.Page.DiffExp.CreatedAt}}</i></p>
+
+<ul>
+{{ $lookup := .Page.Lookup }}
+{{ range .Page.Values }}
+<li>{{(index $lookup .DimensionId)}} - {{.Diff}}</li>
+{{ end }}
+</ul>
+
+{{ template "footer" . }}

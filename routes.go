@@ -19,6 +19,8 @@ var (
 		"the secret for securing cookie information")
 
 	projectId = webhelp.NewIntArgMux()
+	controlId = webhelp.NewIntArgMux()
+	diffExpId = webhelp.NewIntArgMux()
 )
 
 func main() {
@@ -42,14 +44,41 @@ func main() {
 
 	routes := webhelp.LoggingHandler(
 		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
-			webhelp.OverlayMux{Fallback: oauth2.LoginRequired(webhelp.DirMux{
-				"": renderer.Render(app.ProjectList),
-				"project": projectId.ShiftIf(webhelp.MethodMux{
-					"GET": renderer.Render(app.Project),
-				}, webhelp.ExactPath(webhelp.MethodMux{
-					"GET":  webhelp.RedirectHandler("/"),
-					"POST": renderer.Process(app.NewProject),
-				}))}),
+			webhelp.OverlayMux{
+				Fallback: oauth2.LoginRequired(webhelp.DirMux{
+					"": renderer.Render(app.ProjectList),
+
+					"project": projectId.OptShift(
+
+						webhelp.ExactPath(webhelp.MethodMux{
+							"GET":  webhelp.RedirectHandler("/"),
+							"POST": renderer.Process(app.NewProject),
+						}),
+
+						webhelp.DirMux{
+							"": webhelp.Exact(renderer.Render(app.Project)),
+
+							"diffexp": diffExpId.OptShift(
+								webhelp.ExactPath(webhelp.MethodMux{
+									"GET":  ProjectRedirector,
+									"POST": renderer.Process(app.NewDiffExp),
+								}),
+								webhelp.Exact(renderer.Render(app.DiffExp)),
+							),
+
+							"control": controlId.OptShift(
+								webhelp.ExactPath(webhelp.MethodMux{
+									"GET":  ProjectRedirector,
+									"POST": renderer.Process(app.NewControl),
+								}),
+
+								webhelp.DirMux{
+									"": webhelp.Exact(renderer.Render(app.Control)),
+									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
+										renderer.Process(app.NewSample))),
+								}),
+						},
+					)}),
 				Overlay: webhelp.DirMux{
 					"auth": oauth2}}))
 
