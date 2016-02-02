@@ -264,28 +264,26 @@ func (a *App) DiffExpSimilar(ctx context.Context, req *http.Request,
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
-	var values []DiffExpValue
-	err = a.db.Where("diff_exp_id = ?", diffexp.Id).Order("diff desc").Find(
-		&values).Error
+
+	limit, err := strconv.Atoi(req.FormValue("k"))
+	if err != nil {
+		return "", nil, webhelp.ErrBadRequest.New("missing numerical k query param")
+	}
+
+	up_regulated, down_regulated, err := a.topkSignature(ctx, diffexp, limit)
 	if err != nil {
 		return "", nil, err
 	}
-	var dims []Dimension
-	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
+
+	results, err := a.topkSearch(ctx, proj, up_regulated, down_regulated, limit)
 	if err != nil {
 		return "", nil, err
 	}
-	dimlookup := make(map[int64]string, len(dims))
-	for _, dim := range dims {
-		dimlookup[dim.Id] = dim.Name
-	}
-	dims = nil
 
 	return "similar", map[string]interface{}{
 		"Project": proj,
 		"DiffExp": diffexp,
-		"Values":  values,
-		"Lookup":  dimlookup}, nil
+		"Results": results}, nil
 }
 
 func (a *App) Control(ctx context.Context, req *http.Request,
@@ -523,13 +521,140 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 
 func (a *App) Search(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, read_only, err := a.GetProject(user, projectId.Get(ctx))
+	proj, _, err := a.GetProject(user, projectId.Get(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
 
+	up_regulated_strings := strings.Fields(req.FormValue("up-regulated"))
+	down_regulated_strings := strings.Fields(req.FormValue("down-regulated"))
+	limit, err := strconv.Atoi(req.FormValue("k"))
+	if err != nil {
+		return "", nil, webhelp.ErrBadRequest.New("invalid k parameter")
+	}
+	if len(up_regulated_strings)+len(down_regulated_strings) == 0 {
+		return "", nil, webhelp.ErrBadRequest.New("no dimensions provided")
+	}
+
+	var dims []Dimension
+	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
+	if err != nil {
+		return "", nil, err
+	}
+	dimlookup := make(map[string]int64, len(dims))
+	for _, dim := range dims {
+		dimlookup[dim.Name] = dim.Id
+	}
+	dims = nil
+
+	seen := make(map[string]bool,
+		len(up_regulated_strings)+len(down_regulated_strings))
+	up_regulated := make([]int64, 0, len(up_regulated_strings))
+	down_regulated := make([]int64, 0, len(down_regulated_strings))
+	for _, val := range up_regulated_strings {
+		if seen[val] {
+			return "", nil, webhelp.ErrBadRequest.New("duplicated dimension")
+		}
+		seen[val] = true
+		id, exists := dimlookup[val]
+		if !exists {
+			return "", nil, webhelp.ErrBadRequest.New("unknown dimension")
+		}
+		up_regulated = append(up_regulated, id)
+	}
+	for _, val := range down_regulated_strings {
+		if seen[val] {
+			return "", nil, webhelp.ErrBadRequest.New("duplicated dimension")
+		}
+		seen[val] = true
+		id, exists := dimlookup[val]
+		if !exists {
+			return "", nil, webhelp.ErrBadRequest.New("unknown dimension")
+		}
+		down_regulated = append(down_regulated, id)
+	}
+
+	results, err := a.topkSearch(ctx, proj, up_regulated, down_regulated, limit)
+	if err != nil {
+		return "", nil, err
+	}
+
 	return "results", map[string]interface{}{
-		"Project":  proj,
-		"ReadOnly": read_only,
-		"Results":  nil}, nil
+		"Project": proj,
+		"Results": results}, nil
+}
+
+func (a *App) topkSignature(ctx context.Context, diffexp *DiffExp, limit int) (
+	up, down []int64, err error) {
+
+	var values []DiffExpValue
+	err = a.db.Where("diff_exp_id = ?", diffexp.Id).Order(
+		"abs_diff desc").Limit(limit).Find(&values).Error
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, val := range values {
+		if val.Diff < 0 {
+			down = append(down, val.DimensionId)
+		}
+		if val.Diff > 0 {
+			up = append(up, val.DimensionId)
+		}
+	}
+
+	return up, down, nil
+}
+
+type SearchResult struct {
+	DiffExp
+	Score int
+}
+
+type SearchResults []SearchResult
+
+func (l SearchResults) Len() int           { return len(l) }
+func (l SearchResults) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+func (l SearchResults) Less(i, j int) bool { return l[i].Score > l[j].Score }
+
+func (a *App) topkSearch(ctx context.Context, proj *Project, up, down []int64,
+	limit int) (result SearchResults, err error) {
+	var diffexps []DiffExp
+	err = a.db.Where("project_id = ?", proj.Id).Find(&diffexps).Error
+	if err != nil {
+		return nil, err
+	}
+
+	up_lookup := make(map[int64]bool, len(up))
+	down_lookup := make(map[int64]bool, len(down))
+	for _, id := range up {
+		up_lookup[id] = true
+	}
+	for _, id := range down {
+		down_lookup[id] = true
+	}
+
+	result = make(SearchResults, 0, len(diffexps))
+	for _, diffexp := range diffexps {
+		other_up, other_down, err := a.topkSignature(ctx, &diffexp, limit)
+		if err != nil {
+			return nil, err
+		}
+		val := SearchResult{DiffExp: diffexp}
+		for _, id := range other_up {
+			if up_lookup[id] {
+				val.Score += 1
+			}
+		}
+		for _, id := range other_down {
+			if down_lookup[id] {
+				val.Score += 1
+			}
+		}
+		result = append(result, val)
+	}
+
+	sort.Sort(result)
+
+	return result, nil
 }

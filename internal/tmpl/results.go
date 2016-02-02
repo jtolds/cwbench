@@ -8,7 +8,14 @@ func init() {
 
 <h1>Project: <a href="/project/{{.Page.Project.Id}}">{{.Page.Project.Name}}</a></h1>
 
-<p>Not yet implemented</p>
+<h2>Search results</h2>
+
+<table class="table table-striped">
+<tr><th>Sample</th><th>Score</th></tr>
+{{ range .Page.Results }}
+<tr><td>{{.Name}}</td><td>{{.Score}}</td></tr>
+{{ end }}
+</table>
 
 {{ template "footer" . }}`)
 }

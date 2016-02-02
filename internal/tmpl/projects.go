@@ -9,7 +9,7 @@ func init() {
 <h1>Your Projects</h1>
 <ul>
 {{ range .Page.Projects }}
-<li><a href="/project/{{.Id}}">{{.Name}}</a></li>
+<li><a href="/project/{{.Id}}">{{.Name}}</a>{{if .Public}} (public){{end}}</li>
 {{ end }}
 
 <br/>

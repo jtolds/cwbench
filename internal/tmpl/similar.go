@@ -22,7 +22,12 @@ func init() {
 <div class="panel panel-default">
   <div class="panel-body">
 
-Not implemented.
+  <table class="table table-striped">
+  <tr><th>Sample</th><th>Score</th></tr>
+  {{ range .Page.Results }}
+  <tr><td>{{.Name}}</td><td>{{.Score}}</td></tr>
+  {{ end }}
+  </table>
 
   </div>
 </div>

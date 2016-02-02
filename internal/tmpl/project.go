@@ -49,7 +49,7 @@ func init() {
 <div class="col-md-12 form-inline" style="text-align:right;">
   <div class="form-group">
     <label for="topkInput"><strong>k = </strong></label>
-    <input type="number" name="topk" class="form-control" id="topkInput"
+    <input type="number" name="k" class="form-control" id="topkInput"
       value="25" />
   </div>
   <button type="submit" class="btn btn-default">Search</button>

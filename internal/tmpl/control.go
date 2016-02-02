@@ -10,7 +10,6 @@ func init() {
 <h2>Control: {{.Page.Control.Name}}</h2>
 <p>Created at <i>{{.Page.Control.CreatedAt.Format "Jan 02, 2006 15:04 MST"}}</i></p>
 
-
 <ul class="nav nav-tabs" role="tablist">
   <li role="presentation" class="active">
     <a href="#ranks" aria-controls="ranks" role="tab" data-toggle="tab">Expression Ranks</a>
@@ -28,7 +27,6 @@ func init() {
 
 <div class="tab-content">
   <div role="tabpanel" id="ranks" class="tab-pane fade in active">
-
 
 <table class="table table-striped">
 <tr><th>Dimension</th><th>Rank</th></tr>
