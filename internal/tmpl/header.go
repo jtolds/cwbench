@@ -50,9 +50,10 @@ func init() {
                 <img src="{{.User.Picture}}"
                     style="max-width: 25px; max-height: 25px; margin: 0; padding: 0;"
                     class="img-rounded">
-                 {{ if (ne .User.Name "") }}{{.User.Name}}{{ else }}{{.User.Email}}{{ end }}
+                 {{ if (ne .User.Name "") }}{{.User.Name}}{{ else if (ne .User.Email "") }}{{.User.Email}}{{else}}User <code>{{.User.Id}}</code>{{ end }}
                  <span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
+                <li><a href="/account/apikeys">API keys</a></li>
                 <li><a href="{{.LogoutURL}}">Log Out</a></li>
               </ul>
             </li>

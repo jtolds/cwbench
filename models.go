@@ -17,6 +17,11 @@ import (
 // * perturbagens
 // * differential expressions (w/ranks)
 
+type APIKey struct {
+	UserId string `sql:"index"`
+	Key    string `sql:"index"`
+}
+
 type Project struct {
 	Id        int64 `gorm:"primary_key"`
 	CreatedAt time.Time
@@ -79,5 +84,6 @@ func (a *App) Migrate() error {
 	errs.Add(a.db.AutoMigrate(&DiffExpValue{}).Error)
 	errs.Add(a.db.AutoMigrate(&Control{}).Error)
 	errs.Add(a.db.AutoMigrate(&ControlValue{}).Error)
+	errs.Add(a.db.AutoMigrate(&APIKey{}).Error)
 	return errs.Finalize()
 }

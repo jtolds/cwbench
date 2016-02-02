@@ -35,10 +35,7 @@ func (r Renderer) Render(logic Logic) webhelp.Handler {
 	return webhelp.HandlerFunc(
 		func(ctx context.Context, w webhelp.ResponseWriter,
 			req *http.Request) error {
-			user, err := LoadUser(ctx)
-			if err != nil {
-				return err
-			}
+			user := LoadUser(ctx)
 			tmpl, page, err := logic(ctx, req, user)
 			if err != nil {
 				return err
@@ -61,11 +58,7 @@ type Handler func(ctx context.Context, w webhelp.ResponseWriter,
 func (r Renderer) Process(logic Handler) webhelp.Handler {
 	return webhelp.ExactPath(webhelp.HandlerFunc(func(ctx context.Context,
 		w webhelp.ResponseWriter, req *http.Request) error {
-		user, err := LoadUser(ctx)
-		if err != nil {
-			return err
-		}
-		return logic(ctx, w, req, user)
+		return logic(ctx, w, req, LoadUser(ctx))
 	}))
 }
 

@@ -45,7 +45,7 @@ func main() {
 	routes := webhelp.LoggingHandler(
 		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
 			webhelp.OverlayMux{
-				Fallback: oauth2.LoginRequired(webhelp.DirMux{
+				Fallback: app.LoginRequired(webhelp.DirMux{
 					"": webhelp.Exact(renderer.Render(app.ProjectList)),
 
 					"project": projectId.OptShift(
@@ -88,6 +88,13 @@ func main() {
 							),
 						},
 					),
+
+					"account": webhelp.DirMux{
+						"apikeys": webhelp.ExactPath(webhelp.MethodMux{
+							"GET":  renderer.Render(app.APIKeys),
+							"POST": renderer.Process(app.NewAPIKey),
+						}),
+					},
 				}),
 				Overlay: webhelp.DirMux{
 					"auth": oauth2,

@@ -4,6 +4,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"math"
@@ -37,6 +39,8 @@ func NewApp() (*App, error) {
 	}
 	return &App{db: db}, nil
 }
+
+func (a *App) DB() gorm.DB { return a.db }
 
 func (a *App) Close() error { return a.db.Close() }
 
@@ -657,4 +661,42 @@ func (a *App) topkSearch(ctx context.Context, proj *Project, up, down []int64,
 	sort.Sort(result)
 
 	return result, nil
+}
+
+func (a *App) APIKeys(ctx context.Context, req *http.Request,
+	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
+
+	var keys []*APIKey
+	err = a.db.Where("user_id = ?", user.Id).Order("key asc").Find(
+		&keys).Error
+	if err != nil {
+		return "", nil, err
+	}
+
+	return "apikeys", map[string]interface{}{
+		"Keys": keys,
+	}, nil
+}
+
+func (a *App) NewAPIKey(ctx context.Context, w webhelp.ResponseWriter,
+	req *http.Request, user *UserInfo) error {
+
+	var value [16]byte
+	_, err := rand.Read(value[:])
+	if err != nil {
+		return err
+	}
+
+	tx := txWrapper{DB: a.db.Begin()}
+	defer tx.Rollback()
+	err = tx.Create(&APIKey{
+		UserId: user.Id,
+		Key:    hex.EncodeToString(value[:])}).Error
+	if err != nil {
+		return err
+	}
+
+	tx.Commit()
+
+	return webhelp.Redirect(w, req, fmt.Sprintf("/account/apikeys"))
 }
