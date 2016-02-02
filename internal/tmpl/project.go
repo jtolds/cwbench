@@ -11,6 +11,15 @@ func init() {
 <p>Project is associated with {{ .Page.DimensionCount }} dimensions.</p>
 
 <h2>Search</h2>
+
+<ul class="nav nav-tabs">
+  <li role="presentation" class="active"><a href="#">Top-k Search</a></li>
+  <li role="presentation"><a href="#" onclick="return false;">k-Barcoding Search</a></li>
+</ul>
+
+<div class="panel panel-default">
+  <div class="panel-body">
+
 <form method="POST" action="/project/{{.Page.Project.Id}}/search">
 <div class="row">
 <div class="col-md-6">
@@ -24,8 +33,20 @@ func init() {
   <br/>
 </div>
 </div>
-<button type="submit" class="btn btn-default">Search</button>
+<div class="row">
+<div class="col-md-12 form-inline" style="text-align:right;">
+  <div class="form-group">
+    <label for="topkInput"><strong>k = </strong></label>
+    <input type="number" name="topk" class="form-control" id="topkInput"
+      value="25" />
+  </div>
+  <button type="submit" class="btn btn-default">Search</button>
+</div>
+</div>
 </form>
+
+  </div>
+</div>
 
 <div class="row">
 
