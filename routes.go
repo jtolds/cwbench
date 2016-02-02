@@ -46,7 +46,7 @@ func main() {
 		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
 			webhelp.OverlayMux{
 				Fallback: oauth2.LoginRequired(webhelp.DirMux{
-					"": renderer.Render(app.ProjectList),
+					"": webhelp.Exact(renderer.Render(app.ProjectList)),
 
 					"project": projectId.OptShift(
 
@@ -77,6 +77,9 @@ func main() {
 									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
 										renderer.Process(app.NewSample))),
 								}),
+
+							"search": webhelp.ExactMethod("POST", webhelp.ExactPath(
+								renderer.Render(app.Search))),
 						},
 					)}),
 				Overlay: webhelp.DirMux{

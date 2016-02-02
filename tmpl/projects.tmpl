@@ -7,11 +7,12 @@
 {{ end }}
 
 <br/>
-<li>
+<li>Create new:<br/>
   <form method="POST" action="/project/">
-  <input type="text" name="name" /><br/>
-  <textarea name="dimensions"></textarea>
-  <input type="submit" value="Create" />
+  <input type="text" name="name" class="form-control" placeholder="Name"><br/>
+  <textarea name="dimensions" class="form-control" rows="5"
+      placeholder="Dimensions (whitespace-separated)"></textarea><br/>
+  <button type="submit" class="btn btn-default">Create</button>
   </form>
 </li>
 </ul>

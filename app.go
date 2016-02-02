@@ -489,3 +489,16 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/diffexp/%d",
 		proj.Id, diffexp.Id))
 }
+
+func (a *App) Search(ctx context.Context, req *http.Request,
+	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
+	proj, read_only, err := a.GetProject(user, projectId.Get(ctx))
+	if err != nil {
+		return "", nil, webhelp.ErrNotFound.Wrap(err)
+	}
+
+	return "results", map[string]interface{}{
+		"Project":  proj,
+		"ReadOnly": read_only,
+		"Results":  nil}, nil
+}

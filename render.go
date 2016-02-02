@@ -75,7 +75,7 @@ func NewRenderer() (*Renderer, error) {
 }
 
 func (r Renderer) Render(logic Logic) webhelp.Handler {
-	return webhelp.Exact(webhelp.HandlerFunc(
+	return webhelp.HandlerFunc(
 		func(ctx context.Context, w webhelp.ResponseWriter,
 			req *http.Request) error {
 			user, err := LoadUser(ctx)
@@ -95,7 +95,7 @@ func (r Renderer) Render(logic Logic) webhelp.Handler {
 				User:      user,
 				LogoutURL: oauth2.LogoutURL("/"),
 				Page:      page})
-		}))
+		})
 }
 
 type Handler func(ctx context.Context, w webhelp.ResponseWriter,
