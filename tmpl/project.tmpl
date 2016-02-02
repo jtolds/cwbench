@@ -11,6 +11,7 @@
 <li><a href="/project/{{$page.Project.Id}}/control/{{.Id}}">{{.Name}}</a></li>
 {{ end }}
 
+{{ if not .Page.ReadOnly }}
 <br/>
 <li>
   <form method="POST" action="/project/{{.Page.Project.Id}}/control">
@@ -19,6 +20,7 @@
   <input type="submit" value="Upload" />
   </form>
 </li>
+{{ end }}
 </ul>
 
 <h2>Differential expressions</h2>
@@ -28,6 +30,7 @@
 <li><a href="/project/{{$page.Project.Id}}/diffexp/{{.Id}}">{{.Name}}</a></li>
 {{ end }}
 
+{{ if not .Page.ReadOnly }}
 <br/>
 <li>
   <form method="POST" action="/project/{{.Page.Project.Id}}/diffexp">
@@ -36,6 +39,7 @@
   <input type="submit" value="Upload" />
   </form>
 </li>
+{{ end }}
 </ul>
 
 {{ template "footer" . }}

@@ -44,7 +44,7 @@ func (a *App) ProjectList(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{},
 	err error) {
 	var projects []*Project
-	err = a.db.Where("user_id = ?", user.Id).Find(&projects).Error
+	err = a.db.Where("public OR user_id = ?", user.Id).Find(&projects).Error
 	if err != nil {
 		return "", nil, err
 	}
@@ -52,14 +52,15 @@ func (a *App) ProjectList(ctx context.Context, req *http.Request,
 }
 
 func (a *App) GetProject(user *UserInfo, project_id int64) (
-	*Project, error) {
-	var proj Project
-	err := a.db.Where(
-		"user_id = ? AND id = ?", user.Id, project_id).First(&proj).Error
+	proj *Project, read_only bool, err error) {
+	proj = &Project{}
+	err = a.db.Where(
+		"(public OR user_id = ?) AND id = ?", user.Id,
+		project_id).First(proj).Error
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
-	return &proj, nil
+	return proj, proj.UserId != user.Id, nil
 }
 
 func (a *App) GetDiffExp(user *UserInfo, project_id, diff_exp_id int64) (
@@ -72,27 +73,27 @@ func (a *App) GetDiffExp(user *UserInfo, project_id, diff_exp_id int64) (
 	if project_id != diffexp.ProjectId {
 		return nil, nil, webhelp.ErrNotFound.New("not found")
 	}
-	proj, err := a.GetProject(user, diffexp.ProjectId)
+	proj, _, err := a.GetProject(user, diffexp.ProjectId)
 	return proj, &diffexp, err
 }
 
 func (a *App) GetControl(user *UserInfo, project_id, control_id int64) (
-	*Project, *Control, error) {
-	var control Control
-	err := a.db.Where("id = ?", control_id).First(&control).Error
+	proj *Project, control *Control, read_only bool, err error) {
+	control = &Control{}
+	err = a.db.Where("id = ?", control_id).First(control).Error
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, true, err
 	}
 	if project_id != control.ProjectId {
-		return nil, nil, webhelp.ErrNotFound.New("not found")
+		return nil, nil, true, webhelp.ErrNotFound.New("not found")
 	}
-	proj, err := a.GetProject(user, control.ProjectId)
-	return proj, &control, err
+	proj, read_only, err = a.GetProject(user, control.ProjectId)
+	return proj, control, read_only, err
 }
 
 func (a *App) Project(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, err := a.GetProject(user, projectId.Get(ctx))
+	proj, read_only, err := a.GetProject(user, projectId.Get(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
@@ -113,6 +114,7 @@ func (a *App) Project(ctx context.Context, req *http.Request,
 	}
 	return "project", map[string]interface{}{
 		"Project":    proj,
+		"ReadOnly":   read_only,
 		"Dimensions": dims,
 		"DiffExps":   diffexps,
 		"Controls":   controls,
@@ -145,9 +147,12 @@ func (a *App) NewProject(ctx context.Context, w webhelp.ResponseWriter,
 
 func (a *App) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo) error {
-	proj, err := a.GetProject(user, projectId.Get(ctx))
+	proj, read_only, err := a.GetProject(user, projectId.Get(ctx))
 	if err != nil {
 		return webhelp.ErrNotFound.Wrap(err)
+	}
+	if read_only {
+		return webhelp.ErrMethodNotAllowed.New("read only project")
 	}
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
@@ -214,7 +219,8 @@ func (a *App) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 
 func (a *App) DiffExp(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, diffexp, err := a.GetDiffExp(user, projectId.Get(ctx), diffExpId.Get(ctx))
+	proj, diffexp, err := a.GetDiffExp(user, projectId.Get(ctx),
+		diffExpId.Get(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
@@ -243,7 +249,7 @@ func (a *App) DiffExp(ctx context.Context, req *http.Request,
 
 func (a *App) Control(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, control, err := a.GetControl(user, projectId.Get(ctx),
+	proj, control, read_only, err := a.GetControl(user, projectId.Get(ctx),
 		controlId.Get(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
@@ -265,17 +271,21 @@ func (a *App) Control(ctx context.Context, req *http.Request,
 	dims = nil
 
 	return "control", map[string]interface{}{
-		"Project": proj,
-		"Control": control,
-		"Values":  values,
-		"Lookup":  dimlookup}, nil
+		"Project":  proj,
+		"ReadOnly": read_only,
+		"Control":  control,
+		"Values":   values,
+		"Lookup":   dimlookup}, nil
 }
 
 func (a *App) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo) error {
-	proj, err := a.GetProject(user, projectId.Get(ctx))
+	proj, read_only, err := a.GetProject(user, projectId.Get(ctx))
 	if err != nil {
 		return webhelp.ErrNotFound.Wrap(err)
+	}
+	if read_only {
+		return webhelp.ErrMethodNotAllowed.New("read only project")
 	}
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
@@ -360,10 +370,13 @@ func (p rankList) Less(i, j int) bool {
 
 func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo) error {
-	proj, control, err := a.GetControl(user, projectId.Get(ctx),
+	proj, control, read_only, err := a.GetControl(user, projectId.Get(ctx),
 		controlId.Get(ctx))
 	if err != nil {
 		return webhelp.ErrNotFound.Wrap(err)
+	}
+	if read_only {
+		return webhelp.ErrMethodNotAllowed.New("read only project")
 	}
 
 	var control_values []ControlValue

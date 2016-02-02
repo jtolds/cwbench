@@ -22,6 +22,7 @@ type Project struct {
 	CreatedAt time.Time
 	UserId    string `sql:"index"`
 	Name      string
+	Public    bool
 }
 
 type Dimension struct {

@@ -1,6 +1,6 @@
 {{ template "header" . }}
 
-<h1>Project: {{.Page.Project.Name}}</h1>
+<h1>Project: <a href="/project/{{.Page.Project.Id}}">{{.Page.Project.Name}}</a></h1>
 <h2>Differential expression: {{.Page.DiffExp.Name}}</h2>
 <p>Created at <i>{{.Page.DiffExp.CreatedAt}}</i></p>
 

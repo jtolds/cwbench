@@ -1,6 +1,6 @@
 {{ template "header" . }}
 
-<h1>Project: {{.Page.Project.Name}}</h1>
+<h1>Project: <a href="/project/{{.Page.Project.Id}}">{{.Page.Project.Name}}</a></h1>
 <h2>Control: {{.Page.Control.Name}}</h2>
 <p>Created at <i>{{.Page.Control.CreatedAt}}</i></p>
 
@@ -11,23 +11,13 @@
 {{ end }}
 </ul>
 
-
-
-<h2>Samples</h2>
-<ul>
-{{ $page := .Page }}
-{{ range .Page.Samples }}
-<li><a href="/project/{{$page.Project.Id}}/control/{{$page.Control.Id}}/sample/{{.Id}}">{{.Name}}</a></li>
+{{ if not .Page.ReadOnly }}
+<h3>Upload a new sample</h3>
+<form method="POST" action="/project/{{.Page.Project.Id}}/control/{{.Page.Control.Id}}/sample">
+<input type="text" name="name" /><br/>
+<textarea name="values"></textarea>
+<input type="submit" value="Upload" />
+</form>
 {{ end }}
-
-<br/>
-<li>
-  <form method="POST" action="/project/{{.Page.Project.Id}}/control/{{.Page.Control.Id}}/sample">
-  <input type="text" name="name" /><br/>
-  <textarea name="values"></textarea>
-  <input type="submit" value="Upload" />
-  </form>
-</li>
-</ul>
 
 {{ template "footer" . }}
