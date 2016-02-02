@@ -7,18 +7,30 @@ func init() {
 	register("project", `{{ template "header" . }}
 
 <h1>Project: {{.Page.Project.Name}}</h1>
-<p>Created at <i>{{.Page.Project.CreatedAt}}</i></p>
+<p>Created at <i>{{.Page.Project.CreatedAt.Format "Jan 02, 2006 15:04 MST"}}</i></p>
 <p>Project is associated with {{ .Page.DimensionCount }} dimensions.</p>
 
 <h2>Search</h2>
 
-<ul class="nav nav-tabs">
-  <li role="presentation" class="active"><a href="#">Top-k Search</a></li>
-  <li role="presentation"><a href="#" onclick="return false;">k-Barcoding Search</a></li>
+<ul class="nav nav-tabs" role="tablist">
+  <li role="presentation" class="active">
+    <a href="#topk" aria-controls="topk" role="tab" data-toggle="tab">Top-k</a>
+  </li>
+  <li role="presentation">
+    <a href="#kbarcoding" aria-controls="kbarcoding" role="tab"
+      data-toggle="tab">k-Barcoding</a>
+  </li>
+  <li role="presentation">
+    <a href="#kolmogorov" aria-controls="kolmogorov" role="tab"
+      data-toggle="tab">Kolmogorov-Smirnov</a>
+  </li>
 </ul>
 
 <div class="panel panel-default">
   <div class="panel-body">
+
+<div class="tab-content">
+  <div role="tabpanel" id="topk" class="tab-pane fade in active">
 
 <form method="POST" action="/project/{{.Page.Project.Id}}/search">
 <div class="row">
@@ -44,6 +56,15 @@ func init() {
 </div>
 </div>
 </form>
+
+  </div>
+  <div role="tabpanel" id="kbarcoding" class="tab-pane fade">
+  Not yet implemented
+  </div>
+  <div role="tabpanel" id="kolmogorov" class="tab-pane fade">
+  Not yet implemented
+  </div>
+</div>
 
   </div>
 </div>

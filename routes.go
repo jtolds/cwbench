@@ -63,7 +63,11 @@ func main() {
 									"GET":  ProjectRedirector,
 									"POST": renderer.Process(app.NewDiffExp),
 								}),
-								webhelp.Exact(renderer.Render(app.DiffExp)),
+								webhelp.DirMux{
+									"": webhelp.ExactGet(renderer.Render(app.DiffExp)),
+									"similar": webhelp.ExactGet(
+										renderer.Render(app.DiffExpSimilar)),
+								},
 							),
 
 							"control": controlId.OptShift(
@@ -76,14 +80,18 @@ func main() {
 									"": webhelp.Exact(renderer.Render(app.Control)),
 									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
 										renderer.Process(app.NewSample))),
-								}),
+								},
+							),
 
-							"search": webhelp.ExactMethod("POST", webhelp.ExactPath(
-								renderer.Render(app.Search))),
+							"search": webhelp.ExactMethod("POST",
+								webhelp.ExactPath(renderer.Render(app.Search)),
+							),
 						},
-					)}),
+					),
+				}),
 				Overlay: webhelp.DirMux{
-					"auth": oauth2}}))
+					"auth": oauth2,
+				}}))
 
 	switch flag.Arg(0) {
 	case "migrate":

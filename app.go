@@ -257,6 +257,37 @@ func (a *App) DiffExp(ctx context.Context, req *http.Request,
 		"Lookup":  dimlookup}, nil
 }
 
+func (a *App) DiffExpSimilar(ctx context.Context, req *http.Request,
+	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
+	proj, diffexp, err := a.GetDiffExp(user, projectId.Get(ctx),
+		diffExpId.Get(ctx))
+	if err != nil {
+		return "", nil, webhelp.ErrNotFound.Wrap(err)
+	}
+	var values []DiffExpValue
+	err = a.db.Where("diff_exp_id = ?", diffexp.Id).Order("diff desc").Find(
+		&values).Error
+	if err != nil {
+		return "", nil, err
+	}
+	var dims []Dimension
+	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
+	if err != nil {
+		return "", nil, err
+	}
+	dimlookup := make(map[int64]string, len(dims))
+	for _, dim := range dims {
+		dimlookup[dim.Id] = dim.Name
+	}
+	dims = nil
+
+	return "similar", map[string]interface{}{
+		"Project": proj,
+		"DiffExp": diffexp,
+		"Values":  values,
+		"Lookup":  dimlookup}, nil
+}
+
 func (a *App) Control(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
 	proj, control, read_only, err := a.GetControl(user, projectId.Get(ctx),
