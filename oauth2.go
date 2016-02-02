@@ -12,6 +12,7 @@ import (
 var (
 	googleClientId     = flag.String("google_client_id", "", "")
 	googleClientSecret = flag.String("google_client_secret", "", "")
+	visibleURL         = flag.String("visible_url", "http://localhost:8080", "")
 
 	oauth2 *oauth2p.ProviderHandler
 )
@@ -22,7 +23,7 @@ func loadOAuth2() {
 			ClientID:     *googleClientId,
 			ClientSecret: *googleClientSecret,
 			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
-			RedirectURL:  "http://localhost:8080/auth/_cb"}),
+			RedirectURL:  *visibleURL + "/auth/_cb"}),
 		"oauth-google", "/auth",
 		oauth2p.RedirectURLs{})
 }
