@@ -4,53 +4,14 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"net/http"
-	"path/filepath"
-	"strings"
 
+	"github.com/jtolds/cwbench/internal/tmpl"
 	"github.com/jtolds/webhelp"
 	"golang.org/x/net/context"
 )
-
-var (
-	tmplPath = flag.String("templates", "./tmpl", "path to templates")
-)
-
-type Pair struct {
-	First, Second interface{}
-}
-
-func makePair(first, second interface{}) Pair {
-	return Pair{First: first, Second: second}
-}
-
-func LoadTemplates() (rv *template.Template, err error) {
-	rv = template.New("root").Funcs(template.FuncMap{
-		"makepair": makePair})
-	files, err := ioutil.ReadDir(*tmplPath)
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".tmpl") {
-			continue
-		}
-		content, err := ioutil.ReadFile(filepath.Join(*tmplPath, file.Name()))
-		if err != nil {
-			return nil, err
-		}
-		_, err = rv.New(strings.TrimSuffix(file.Name(), ".tmpl")).Parse(
-			string(content))
-		if err != nil {
-			return nil, err
-		}
-	}
-	return rv, nil
-}
 
 type PageCtx struct {
 	User      *UserInfo
@@ -67,11 +28,7 @@ type Renderer struct {
 }
 
 func NewRenderer() (*Renderer, error) {
-	templates, err := LoadTemplates()
-	if err != nil {
-		return nil, err
-	}
-	return &Renderer{Templates: templates}, nil
+	return &Renderer{Templates: tmpl.Templates}, nil
 }
 
 func (r Renderer) Render(logic Logic) webhelp.Handler {

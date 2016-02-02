@@ -1,4 +1,10 @@
-{{ template "header" . }}
+// Copyright (C) 2016 JT Olds
+// See LICENSE for copying information
+
+package tmpl
+
+func init() {
+	register("diffexp", `{{ template "header" . }}
 
 <h1>Project: <a href="/project/{{.Page.Project.Id}}">{{.Page.Project.Name}}</a></h1>
 <h2>Differential expression: {{.Page.DiffExp.Name}}</h2>
@@ -12,4 +18,5 @@
 {{ end }}
 </table>
 
-{{ template "footer" . }}
+{{ template "footer" . }}`)
+}

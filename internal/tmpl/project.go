@@ -1,4 +1,10 @@
-{{ template "header" . }}
+// Copyright (C) 2016 JT Olds
+// See LICENSE for copying information
+
+package tmpl
+
+func init() {
+	register("project", `{{ template "header" . }}
 
 <h1>Project: {{.Page.Project.Name}}</h1>
 <p>Created at <i>{{.Page.Project.CreatedAt}}</i></p>
@@ -58,4 +64,5 @@
 </div>
 </div>
 
-{{ template "footer" . }}
+{{ template "footer" . }}`)
+}

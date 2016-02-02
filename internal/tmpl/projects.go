@@ -1,4 +1,10 @@
-{{ template "header" . }}
+// Copyright (C) 2016 JT Olds
+// See LICENSE for copying information
+
+package tmpl
+
+func init() {
+	register("projects", `{{ template "header" . }}
 
 <h1>Your Projects</h1>
 <ul>
@@ -17,4 +23,5 @@
 </li>
 </ul>
 
-{{ template "footer" . }}
+{{ template "footer" . }}`)
+}

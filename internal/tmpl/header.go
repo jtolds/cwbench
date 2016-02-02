@@ -1,4 +1,10 @@
-<!DOCTYPE html>
+// Copyright (C) 2016 JT Olds
+// See LICENSE for copying information
+
+package tmpl
+
+func init() {
+	register("header", `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -54,4 +60,5 @@
         </div>
       </div>
     </nav>
-    <div class="container main">
+    <div class="container main">`)
+}
