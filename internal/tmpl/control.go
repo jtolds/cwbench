@@ -43,7 +43,7 @@ func init() {
 <form method="POST" action="/project/{{.Page.Project.Id}}/control/{{.Page.Control.Id}}/sample">
 <input type="text" name="name" class="form-control" placeholder="Name"><br/>
 <textarea name="values" class="form-control" rows="5"
-    placeholder="dimension value (one dimension per line)"></textarea><br/>
+    placeholder="<dimension> <value> (one dimension per line)"></textarea><br/>
 <button type="submit" class="btn btn-default">Upload</button>
 </form>
 
