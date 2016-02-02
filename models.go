@@ -42,6 +42,7 @@ type DiffExpValue struct {
 	DiffExpId   int64
 	DimensionId int64
 	Diff        int
+	AbsDiff     int
 }
 
 type Control struct {

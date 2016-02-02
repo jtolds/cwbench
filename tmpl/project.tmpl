@@ -2,8 +2,11 @@
 
 <h1>Project: {{.Page.Project.Name}}</h1>
 <p>Created at <i>{{.Page.Project.CreatedAt}}</i></p>
-<p>Project is associated with {{ (len .Page.Dimensions) }} dimensions.</p>
+<p>Project is associated with {{ .Page.DimensionCount }} dimensions.</p>
 
+<div class="row">
+
+<div class="col-md-6">
 <h2>Controls</h2>
 <ul>
 {{ $page := .Page }}
@@ -23,23 +26,18 @@
 {{ end }}
 </ul>
 
+</div>
+<div class="col-md-6">
+
 <h2>Differential expressions</h2>
 <ul>
 {{ $page := .Page }}
 {{ range .Page.DiffExps }}
 <li><a href="/project/{{$page.Project.Id}}/diffexp/{{.Id}}">{{.Name}}</a></li>
 {{ end }}
-
-{{ if not .Page.ReadOnly }}
-<br/>
-<li>
-  <form method="POST" action="/project/{{.Page.Project.Id}}/diffexp">
-  <input type="text" name="name" /><br/>
-  <textarea name="values"></textarea>
-  <input type="submit" value="Upload" />
-  </form>
-</li>
-{{ end }}
 </ul>
+
+</div>
+</div>
 
 {{ template "footer" . }}

@@ -44,7 +44,8 @@ func (a *App) ProjectList(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{},
 	err error) {
 	var projects []*Project
-	err = a.db.Where("public OR user_id = ?", user.Id).Find(&projects).Error
+	err = a.db.Where("public OR user_id = ?", user.Id).Order("name asc").Find(
+		&projects).Error
 	if err != nil {
 		return "", nil, err
 	}
@@ -97,27 +98,30 @@ func (a *App) Project(ctx context.Context, req *http.Request,
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
-	var dims []Dimension
-	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
+	var dimCount int
+	err = a.db.Model(Dimension{}).Where("project_id = ?", proj.Id).Count(
+		&dimCount).Error
 	if err != nil {
 		return "", nil, err
 	}
 	var diffexps []DiffExp
-	err = a.db.Where("project_id = ?", proj.Id).Find(&diffexps).Error
+	err = a.db.Where("project_id = ?", proj.Id).Order("name asc").Find(
+		&diffexps).Error
 	if err != nil {
 		return "", nil, err
 	}
 	var controls []Control
-	err = a.db.Where("project_id = ?", proj.Id).Find(&controls).Error
+	err = a.db.Where("project_id = ?", proj.Id).Order("name asc").Find(
+		&controls).Error
 	if err != nil {
 		return "", nil, err
 	}
 	return "project", map[string]interface{}{
-		"Project":    proj,
-		"ReadOnly":   read_only,
-		"Dimensions": dims,
-		"DiffExps":   diffexps,
-		"Controls":   controls,
+		"Project":        proj,
+		"ReadOnly":       read_only,
+		"DimensionCount": dimCount,
+		"DiffExps":       diffexps,
+		"Controls":       controls,
 	}, nil
 }
 
@@ -203,10 +207,15 @@ func (a *App) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 	dimlookup = nil
 
 	for id, val := range dimdiff {
+		absval := val
+		if absval < 0 {
+			absval *= -1
+		}
 		err := tx.Create(&DiffExpValue{
 			DiffExpId:   diffexp.Id,
 			DimensionId: id,
-			Diff:        val}).Error
+			Diff:        val,
+			AbsDiff:     absval}).Error
 		if err != nil {
 			return err
 		}
@@ -225,7 +234,8 @@ func (a *App) DiffExp(ctx context.Context, req *http.Request,
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
 	var values []DiffExpValue
-	err = a.db.Where("diff_exp_id = ?", diffexp.Id).Find(&values).Error
+	err = a.db.Where("diff_exp_id = ?", diffexp.Id).Order("diff desc").Find(
+		&values).Error
 	if err != nil {
 		return "", nil, err
 	}
@@ -255,7 +265,8 @@ func (a *App) Control(ctx context.Context, req *http.Request,
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
 	var values []ControlValue
-	err = a.db.Where("control_id = ?", control.Id).Find(&values).Error
+	err = a.db.Where("control_id = ?", control.Id).Order(
+		"rank desc").Find(&values).Error
 	if err != nil {
 		return "", nil, err
 	}
@@ -339,16 +350,14 @@ func (a *App) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 	}
 	dimlookup = nil
 
-	sort.Sort(values)
-
-	for rank, entry := range values {
-		err := tx.Create(&ControlValue{
+	err = values.Rank(func(entry rankEntry, rank int) error {
+		return tx.Create(&ControlValue{
 			ControlId:   control.Id,
 			DimensionId: entry.id,
-			Rank:        rank + 1}).Error
-		if err != nil {
-			return err
-		}
+			Rank:        rank}).Error
+	})
+	if err != nil {
+		return err
 	}
 
 	tx.Commit()
@@ -368,6 +377,26 @@ func (p rankList) Less(i, j int) bool {
 	return p[i].val < p[j].val || math.IsNaN(p[i].val) && !math.IsNaN(p[j].val)
 }
 
+func (p rankList) Rank(cb func(entry rankEntry, rank int) error) error {
+	sort.Sort(p)
+	last_rank := 1
+	last_val := math.Inf(-1)
+	for i, entry := range p {
+		rank := i + 1
+		if last_val >= entry.val {
+			rank = last_rank
+		} else {
+			last_val = entry.val
+			last_rank = rank
+		}
+		err := cb(entry, rank)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo) error {
 	proj, control, read_only, err := a.GetControl(user, projectId.Get(ctx),
@@ -380,7 +409,8 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	}
 
 	var control_values []ControlValue
-	err = a.db.Where("control_id = ?", control.Id).Find(&control_values).Error
+	err = a.db.Where("control_id = ?", control.Id).Find(
+		&control_values).Error
 	if err != nil {
 		return err
 	}
@@ -445,16 +475,14 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 			"submission dimensions don't match project dimensions")
 	}
 
-	sort.Sort(values)
-
-	for rank, entry := range values {
-		err := tx.Create(&DiffExpValue{
+	err = values.Rank(func(entry rankEntry, rank int) error {
+		return tx.Create(&DiffExpValue{
 			DiffExpId:   diffexp.Id,
 			DimensionId: entry.id,
-			Diff:        rank + 1 - control_rank_lookup[entry.id]}).Error
-		if err != nil {
-			return err
-		}
+			Diff:        rank - control_rank_lookup[entry.id]}).Error
+	})
+	if err != nil {
+		return err
 	}
 
 	tx.Commit()

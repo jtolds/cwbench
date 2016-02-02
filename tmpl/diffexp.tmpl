@@ -4,11 +4,12 @@
 <h2>Differential expression: {{.Page.DiffExp.Name}}</h2>
 <p>Created at <i>{{.Page.DiffExp.CreatedAt}}</i></p>
 
-<ul>
+<table class="table table-striped">
+<tr><th>Dimension</th><th>Rank difference</th></tr>
 {{ $lookup := .Page.Lookup }}
 {{ range .Page.Values }}
-<li>{{(index $lookup .DimensionId)}} - {{.Diff}}</li>
+<tr><td>{{(index $lookup .DimensionId)}}</td><td>{{.Diff}}</td></tr>
 {{ end }}
-</ul>
+</table>
 
 {{ template "footer" . }}
