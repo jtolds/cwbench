@@ -11,12 +11,16 @@ import (
 	"sort"
 
 	"github.com/jinzhu/gorm"
+	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/spacemonkeygo/errors"
 	"github.com/spacemonkeygo/errors/errhttp"
 )
 
 var (
-	sqlitePath = flag.String("db", "./db.db", "")
+	dbType = flag.String("db", "sqlite3", "the database type to use. "+
+		"can be postgres or sqlite3")
+	dbConn = flag.String("db.conn", "./db.db", "the database connection string")
 
 	Err         = errors.NewClass("error")
 	ErrNotFound = Err.NewClass("not found", errhttp.SetStatusCode(404))
@@ -29,7 +33,7 @@ type Data struct {
 }
 
 func NewData() (*Data, error) {
-	db, err := gorm.Open("sqlite3", *sqlitePath)
+	db, err := gorm.Open(*dbType, *dbConn)
 	if err != nil {
 		return nil, Err.Wrap(err)
 	}

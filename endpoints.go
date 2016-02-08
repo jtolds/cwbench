@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/jtolds/webhelp"
-	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/net/context"
 )
 
