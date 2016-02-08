@@ -101,8 +101,8 @@ func main() {
 				}}))
 
 	switch flag.Arg(0) {
-	case "migrate":
-		err := app.Migrate()
+	case "createdb":
+		err := app.CreateDB()
 		if err != nil {
 			panic(err)
 		}
@@ -111,6 +111,6 @@ func main() {
 	case "routes":
 		webhelp.PrintRoutes(os.Stdout, routes)
 	default:
-		fmt.Printf("Usage: %s <serve|migrate>\n", os.Args[0])
+		fmt.Printf("Usage: %s <serve|createdb|routes>\n", os.Args[0])
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/jtolds/webhelp"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/spacemonkeygo/errors"
 	"golang.org/x/net/context"
 )
 
@@ -26,6 +27,8 @@ const (
 
 var (
 	sqlitePath = flag.String("db", "./db.db", "")
+
+	Err = errors.NewClass("error")
 )
 
 type App struct {
@@ -35,14 +38,14 @@ type App struct {
 func NewApp() (*App, error) {
 	db, err := gorm.Open("sqlite3", *sqlitePath)
 	if err != nil {
-		return nil, err
+		return nil, Err.Wrap(err)
 	}
 	return &App{db: db}, nil
 }
 
 func (a *App) DB() gorm.DB { return a.db }
 
-func (a *App) Close() error { return a.db.Close() }
+func (a *App) Close() error { return Err.Wrap(a.db.Close()) }
 
 func (a *App) ProjectList(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{},
@@ -51,7 +54,7 @@ func (a *App) ProjectList(ctx context.Context, req *http.Request,
 	err = a.db.Where("public OR user_id = ?", user.Id).Order("name asc").Find(
 		&projects).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	return "projects", map[string]interface{}{"Projects": projects}, nil
 }
@@ -63,7 +66,7 @@ func (a *App) GetProject(user *UserInfo, project_id int64) (
 		"(public OR user_id = ?) AND id = ?", user.Id,
 		project_id).First(proj).Error
 	if err != nil {
-		return nil, true, err
+		return nil, true, Err.Wrap(err)
 	}
 	return proj, proj.UserId != user.Id, nil
 }
@@ -73,7 +76,7 @@ func (a *App) GetDiffExp(user *UserInfo, project_id, diff_exp_id int64) (
 	var diffexp DiffExp
 	err := a.db.Where("id = ?", diff_exp_id).First(&diffexp).Error
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, Err.Wrap(err)
 	}
 	if project_id != diffexp.ProjectId {
 		return nil, nil, webhelp.ErrNotFound.New("not found")
@@ -87,7 +90,7 @@ func (a *App) GetControl(user *UserInfo, project_id, control_id int64) (
 	control = &Control{}
 	err = a.db.Where("id = ?", control_id).First(control).Error
 	if err != nil {
-		return nil, nil, true, err
+		return nil, nil, true, Err.Wrap(err)
 	}
 	if project_id != control.ProjectId {
 		return nil, nil, true, webhelp.ErrNotFound.New("not found")
@@ -106,19 +109,19 @@ func (a *App) Project(ctx context.Context, req *http.Request,
 	err = a.db.Model(Dimension{}).Where("project_id = ?", proj.Id).Count(
 		&dimCount).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	var diffexps []DiffExp
 	err = a.db.Where("project_id = ?", proj.Id).Order("name asc").Find(
 		&diffexps).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	var controls []Control
 	err = a.db.Where("project_id = ?", proj.Id).Order("name asc").Find(
 		&controls).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	return "project", map[string]interface{}{
 		"Project":        proj,
@@ -136,7 +139,7 @@ func (a *App) NewProject(ctx context.Context, w webhelp.ResponseWriter,
 	proj := Project{UserId: user.Id, Name: req.FormValue("name")}
 	err := tx.Create(&proj).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 	added := map[string]bool{}
 	for _, dim := range strings.Fields(req.FormValue("dimensions")) {
@@ -146,7 +149,7 @@ func (a *App) NewProject(ctx context.Context, w webhelp.ResponseWriter,
 		added[dim] = true
 		err := tx.Create(&Dimension{ProjectId: proj.Id, Name: dim}).Error
 		if err != nil {
-			return err
+			return Err.Wrap(err)
 		}
 	}
 	tx.Commit()
@@ -165,7 +168,7 @@ func (a *App) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 	dimlookup := make(map[string]int64, len(dims))
 	for _, dim := range dims {
@@ -179,13 +182,16 @@ func (a *App) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 	diffexp := DiffExp{ProjectId: proj.Id, Name: req.FormValue("name")}
 	err = tx.Create(&diffexp).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 
 	dimdiff := make(map[int64]int, len(dimlookup))
 
 	for _, row := range strings.Split(req.FormValue("values"), "\n") {
 		fields := strings.Fields(row)
+		if len(fields) == 0 {
+			continue
+		}
 		if len(fields) != 2 {
 			return webhelp.ErrBadRequest.New("malformed data: %#v", row)
 		}
@@ -221,7 +227,7 @@ func (a *App) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 			Diff:        val,
 			AbsDiff:     absval}).Error
 		if err != nil {
-			return err
+			return Err.Wrap(err)
 		}
 	}
 
@@ -241,12 +247,12 @@ func (a *App) DiffExp(ctx context.Context, req *http.Request,
 	err = a.db.Where("diff_exp_id = ?", diffexp.Id).Order("diff desc").Find(
 		&values).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	dimlookup := make(map[int64]string, len(dims))
 	for _, dim := range dims {
@@ -287,7 +293,8 @@ func (a *App) DiffExpSimilar(ctx context.Context, req *http.Request,
 	return "similar", map[string]interface{}{
 		"Project": proj,
 		"DiffExp": diffexp,
-		"Results": results}, nil
+		"Results": results,
+		"K":       limit}, nil
 }
 
 func (a *App) Control(ctx context.Context, req *http.Request,
@@ -301,12 +308,12 @@ func (a *App) Control(ctx context.Context, req *http.Request,
 	err = a.db.Where("control_id = ?", control.Id).Order(
 		"rank desc").Find(&values).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	dimlookup := make(map[int64]string, len(dims))
 	for _, dim := range dims {
@@ -334,7 +341,7 @@ func (a *App) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 	dimlookup := make(map[string]int64, len(dims))
 	for _, dim := range dims {
@@ -348,7 +355,7 @@ func (a *App) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 	control := Control{ProjectId: proj.Id, Name: req.FormValue("name")}
 	err = tx.Create(&control).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 
 	seen := make(map[int64]bool, len(dimlookup))
@@ -356,6 +363,9 @@ func (a *App) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 
 	for _, row := range strings.Split(req.FormValue("values"), "\n") {
 		fields := strings.Fields(row)
+		if len(fields) == 0 {
+			continue
+		}
 		if len(fields) != 2 {
 			return webhelp.ErrBadRequest.New("malformed data: %#v", row)
 		}
@@ -384,10 +394,10 @@ func (a *App) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 	dimlookup = nil
 
 	err = values.Rank(func(entry rankEntry, rank int) error {
-		return tx.Create(&ControlValue{
+		return Err.Wrap(tx.Create(&ControlValue{
 			ControlId:   control.Id,
 			DimensionId: entry.id,
-			Rank:        rank}).Error
+			Rank:        rank}).Error)
 	})
 	if err != nil {
 		return err
@@ -445,7 +455,7 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	err = a.db.Where("control_id = ?", control.Id).Find(
 		&control_values).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 
 	control_rank_lookup := make(map[int64]int, len(control_values))
@@ -457,7 +467,7 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 	dimlookup := make(map[string]int64, len(dims))
 	for _, dim := range dims {
@@ -474,7 +484,7 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	diffexp := DiffExp{ProjectId: proj.Id, Name: req.FormValue("name")}
 	err = tx.Create(&diffexp).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 
 	seen := make(map[int64]bool, len(dimlookup))
@@ -482,6 +492,9 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 
 	for _, row := range strings.Split(req.FormValue("values"), "\n") {
 		fields := strings.Fields(row)
+		if len(fields) == 0 {
+			continue
+		}
 		if len(fields) != 2 {
 			return webhelp.ErrBadRequest.New("malformed data: %#v", row)
 		}
@@ -509,10 +522,10 @@ func (a *App) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	}
 
 	err = values.Rank(func(entry rankEntry, rank int) error {
-		return tx.Create(&DiffExpValue{
+		return Err.Wrap(tx.Create(&DiffExpValue{
 			DiffExpId:   diffexp.Id,
 			DimensionId: entry.id,
-			Diff:        rank - control_rank_lookup[entry.id]}).Error
+			Diff:        rank - control_rank_lookup[entry.id]}).Error)
 	})
 	if err != nil {
 		return err
@@ -543,7 +556,7 @@ func (a *App) Search(ctx context.Context, req *http.Request,
 	var dims []Dimension
 	err = a.db.Where("project_id = ?", proj.Id).Find(&dims).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 	dimlookup := make(map[string]int64, len(dims))
 	for _, dim := range dims {
@@ -595,7 +608,7 @@ func (a *App) topkSignature(ctx context.Context, diffexp *DiffExp, limit int) (
 	err = a.db.Where("diff_exp_id = ?", diffexp.Id).Order(
 		"abs_diff desc").Limit(limit).Find(&values).Error
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, Err.Wrap(err)
 	}
 
 	for _, val := range values {
@@ -626,7 +639,7 @@ func (a *App) topkSearch(ctx context.Context, proj *Project, up, down []int64,
 	var diffexps []DiffExp
 	err = a.db.Where("project_id = ?", proj.Id).Find(&diffexps).Error
 	if err != nil {
-		return nil, err
+		return nil, Err.Wrap(err)
 	}
 
 	up_lookup := make(map[int64]bool, len(up))
@@ -670,7 +683,7 @@ func (a *App) APIKeys(ctx context.Context, req *http.Request,
 	err = a.db.Where("user_id = ?", user.Id).Order("key asc").Find(
 		&keys).Error
 	if err != nil {
-		return "", nil, err
+		return "", nil, Err.Wrap(err)
 	}
 
 	return "apikeys", map[string]interface{}{
@@ -693,7 +706,7 @@ func (a *App) NewAPIKey(ctx context.Context, w webhelp.ResponseWriter,
 		UserId: user.Id,
 		Key:    hex.EncodeToString(value[:])}).Error
 	if err != nil {
-		return err
+		return Err.Wrap(err)
 	}
 
 	tx.Commit()

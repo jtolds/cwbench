@@ -9,14 +9,6 @@ import (
 	"github.com/spacemonkeygo/errors"
 )
 
-// data model:
-// * user
-// * project
-// * genes
-// * controls
-// * perturbagens
-// * differential expressions (w/ranks)
-
 type APIKey struct {
 	UserId string `sql:"index"`
 	Key    string `sql:"index"`
@@ -63,27 +55,94 @@ type ControlValue struct {
 	Rank        int
 }
 
-func (a *App) Migrate() error {
+func (a *App) CreateDB() error {
 	var errs errors.ErrorGroup
 	tx := a.db.Begin()
-	// why oh why does gorm break with composite primary keys?!
-	errs.Add(tx.Exec(`CREATE TABLE "diff_exp_values" (` +
-		`"diff_exp_id" bigint,` +
-		`"dimension_id" bigint,` +
-		`"diff" int, ` +
-		`primary key("diff_exp_id", "dimension_id"));`).Error)
-	errs.Add(tx.Exec(`CREATE TABLE "control_values" (` +
-		`"control_id" bigint,` +
-		`"dimension_id" bigint,` +
-		`"diff" int, ` +
-		`primary key("control_id", "dimension_id"));`).Error)
+
+	errs.Add(tx.Exec(`CREATE TABLE
+	  api_keys (
+  	  user_id varchar(255),
+  	  key varchar(255)
+	  );`).Error)
+	errs.Add(tx.Exec(`CREATE INDEX
+	  idx_api_keys_user_id ON api_keys(user_id);`).Error)
+	errs.Add(tx.Exec(`CREATE UNIQUE INDEX
+	  idx_api_keys_key ON api_keys(key);`).Error)
+
+	errs.Add(tx.Exec(`CREATE TABLE
+    projects (
+      id integer primary key autoincrement,
+      created_at datetime,
+      user_id varchar(255),
+      name varchar(255),
+      public bool
+    );`).Error)
+	errs.Add(tx.Exec(`CREATE UNIQUE INDEX
+	  idx_projects_user_id_name ON projects(user_id, name);`).Error)
+	errs.Add(tx.Exec(`CREATE INDEX
+	  idx_projects_public ON projects(public);`).Error)
+
+	errs.Add(tx.Exec(`CREATE TABLE
+    dimensions (
+      id integer primary key autoincrement,
+      project_id bigint,
+      name varchar(255)
+    );`).Error)
+	errs.Add(tx.Exec(`CREATE UNIQUE INDEX
+	  idx_dimensions_project_id_name ON dimensions(project_id, name);`).Error)
+
+	errs.Add(tx.Exec(`CREATE TABLE
+    diff_exps (
+      id integer primary key autoincrement,
+      created_at datetime,
+      project_id bigint,
+      name varchar(255)
+    );`).Error)
+	errs.Add(tx.Exec(`CREATE UNIQUE INDEX
+	  idx_diff_exps_project_id_name ON diff_exps(project_id, name);`).Error)
+
+	errs.Add(tx.Exec(`CREATE TABLE
+    diff_exp_values (
+      diff_exp_id bigint,
+      dimension_id bigint,
+      diff integer,
+      abs_diff integer,
+      primary key(diff_exp_id, dimension_id)
+    );`).Error)
+	errs.Add(tx.Exec(`CREATE INDEX
+	  idx_diff_exp_values_diff_exp_id_abs_diff ON
+	      diff_exp_values(diff_exp_id, abs_diff);`).Error)
+	errs.Add(tx.Exec(`CREATE INDEX
+	  idx_diff_exp_values_diff_exp_id_diff ON
+	      diff_exp_values(diff_exp_id, diff);`).Error)
+
+	errs.Add(tx.Exec(`CREATE TABLE
+    controls (
+      id integer primary key autoincrement,
+      created_at datetime,
+      project_id bigint,
+      name varchar(255)
+    );`).Error)
+	errs.Add(tx.Exec(`CREATE UNIQUE INDEX
+	  idx_controls_project_id_name ON controls(project_id, name);`).Error)
+
+	errs.Add(tx.Exec(`CREATE TABLE
+    control_values (
+      control_id bigint,
+      dimension_id bigint,
+      rank integer,
+      primary key(control_id, dimension_id)
+    );`).Error)
+	errs.Add(tx.Exec(`CREATE INDEX
+	  idx_control_values_control_id_rank ON
+	      control_values(control_id, rank);`).Error)
+
+	err := errs.Finalize()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	tx.Commit()
-	errs.Add(a.db.AutoMigrate(&Project{}).Error)
-	errs.Add(a.db.AutoMigrate(&Dimension{}).Error)
-	errs.Add(a.db.AutoMigrate(&DiffExp{}).Error)
-	errs.Add(a.db.AutoMigrate(&DiffExpValue{}).Error)
-	errs.Add(a.db.AutoMigrate(&Control{}).Error)
-	errs.Add(a.db.AutoMigrate(&ControlValue{}).Error)
-	errs.Add(a.db.AutoMigrate(&APIKey{}).Error)
-	return errs.Finalize()
+	return nil
 }

@@ -72,7 +72,9 @@ func init() {
 <div class="row">
 
 <div class="col-md-6">
+
 <h2>Controls</h2>
+
 <ul>
 {{ $page := .Page }}
 {{ range .Page.Controls }}
@@ -96,6 +98,7 @@ func init() {
 <div class="col-md-6">
 
 <h2>Differential expressions</h2>
+
 <ul>
 {{ $page := .Page }}
 {{ range .Page.DiffExps }}

@@ -12,8 +12,11 @@ func init() {
 
 <table class="table table-striped">
 <tr><th>Sample</th><th>Score</th></tr>
+{{ $page := .Page }}
 {{ range .Page.Results }}
-<tr><td>{{.Name}}</td><td>{{.Score}}</td></tr>
+<tr><td>
+  <a href="/project/{{$page.Project.Id}}/diffexp/{{.Id}}">{{.Name}}</a>
+</td><td>{{.Score}}</td></tr>
 {{ end }}
 </table>
 
