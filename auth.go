@@ -43,16 +43,14 @@ type UserInfo struct {
 	Picture       string `json:"picture"`
 }
 
-func (a *App) LoadUser(ctx context.Context, inr *http.Request) (
+func (a *Endpoints) LoadUser(ctx context.Context, inr *http.Request) (
 	*UserInfo, error) {
 	if inr.FormValue("api_key") != "" {
-		var key APIKey
-		err := a.db.Where(
-			"key = ?", inr.FormValue("api_key")).FirstOrInit(&key).Error
+		key, err := a.Data.APIKey(inr.FormValue("api_key"))
 		if err != nil {
 			return nil, err
 		}
-		if key.UserId == "" {
+		if key == nil {
 			return nil, webhelp.ErrUnauthorized.New("invalid api key")
 		}
 		return &UserInfo{Id: key.UserId}, nil
@@ -90,11 +88,11 @@ func (a *App) LoadUser(ctx context.Context, inr *http.Request) (
 }
 
 type loginRequired struct {
-	a *App
+	a *Endpoints
 	h webhelp.Handler
 }
 
-func (a *App) LoginRequired(h webhelp.Handler) webhelp.Handler {
+func (a *Endpoints) LoginRequired(h webhelp.Handler) webhelp.Handler {
 	return loginRequired{a: a, h: h}
 }
 

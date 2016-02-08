@@ -32,7 +32,7 @@ func init() {
 <tr><th>Dimension</th><th>Rank</th></tr>
 {{ $lookup := .Page.Lookup }}
 {{ range .Page.Values }}
-<tr><td>{{(index $lookup .DimensionId)}}</td><td>{{.Rank}}</td></tr>
+<tr><td>{{($lookup.LookupName .DimensionId)}}</td><td>{{.Rank}}</td></tr>
 {{ end }}
 </table>
 

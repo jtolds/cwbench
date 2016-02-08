@@ -36,63 +36,65 @@ func main() {
 		panic(err)
 	}
 
-	app, err := NewApp()
+	data, err := NewData()
 	if err != nil {
 		panic(err)
 	}
-	defer app.Close()
+	defer data.Close()
+
+	endpoints := NewEndpoints(data)
 
 	routes := webhelp.LoggingHandler(
 		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
 			webhelp.OverlayMux{
-				Fallback: app.LoginRequired(webhelp.DirMux{
-					"": webhelp.Exact(renderer.Render(app.ProjectList)),
+				Fallback: endpoints.LoginRequired(webhelp.DirMux{
+					"": webhelp.Exact(renderer.Render(endpoints.ProjectList)),
 
 					"project": projectId.OptShift(
 
 						webhelp.ExactPath(webhelp.MethodMux{
 							"GET":  webhelp.RedirectHandler("/"),
-							"POST": renderer.Process(app.NewProject),
+							"POST": renderer.Process(endpoints.NewProject),
 						}),
 
 						webhelp.DirMux{
-							"": webhelp.Exact(renderer.Render(app.Project)),
+							"": webhelp.Exact(renderer.Render(endpoints.Project)),
 
 							"diffexp": diffExpId.OptShift(
 								webhelp.ExactPath(webhelp.MethodMux{
 									"GET":  ProjectRedirector,
-									"POST": renderer.Process(app.NewDiffExp),
+									"POST": renderer.Process(endpoints.NewDiffExp),
 								}),
 								webhelp.DirMux{
-									"": webhelp.ExactGet(renderer.Render(app.DiffExp)),
+									"": webhelp.ExactGet(renderer.Render(endpoints.DiffExp)),
 									"similar": webhelp.ExactGet(
-										renderer.Render(app.DiffExpSimilar)),
+										renderer.Render(endpoints.DiffExpSimilar)),
 								},
 							),
 
 							"control": controlId.OptShift(
 								webhelp.ExactPath(webhelp.MethodMux{
 									"GET":  ProjectRedirector,
-									"POST": renderer.Process(app.NewControl),
+									"POST": renderer.Process(endpoints.NewControl),
 								}),
 
 								webhelp.DirMux{
-									"": webhelp.Exact(renderer.Render(app.Control)),
+									"": webhelp.Exact(renderer.Render(endpoints.Control)),
 									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
-										renderer.Process(app.NewSample))),
+										renderer.Process(endpoints.NewSample))),
 								},
 							),
 
 							"search": webhelp.ExactMethod("POST",
-								webhelp.ExactPath(renderer.Render(app.Search)),
+								webhelp.ExactPath(renderer.Render(endpoints.Search)),
 							),
 						},
 					),
 
 					"account": webhelp.DirMux{
 						"apikeys": webhelp.ExactPath(webhelp.MethodMux{
-							"GET":  renderer.Render(app.APIKeys),
-							"POST": renderer.Process(app.NewAPIKey),
+							"GET":  renderer.Render(endpoints.APIKeys),
+							"POST": renderer.Process(endpoints.NewAPIKey),
 						}),
 					},
 				}),
@@ -102,7 +104,7 @@ func main() {
 
 	switch flag.Arg(0) {
 	case "createdb":
-		err := app.CreateDB()
+		err := data.CreateDB()
 		if err != nil {
 			panic(err)
 		}

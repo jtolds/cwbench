@@ -26,7 +26,7 @@ func init() {
 <tr><th>Dimension</th><th>Rank difference</th></tr>
 {{ $lookup := .Page.Lookup }}
 {{ range .Page.Values }}
-<tr><td>{{(index $lookup .DimensionId)}}</td><td>{{.Diff}}</td></tr>
+<tr><td>{{($lookup.LookupName .DimensionId)}}</td><td>{{.Diff}}</td></tr>
 {{ end }}
 </table>
 

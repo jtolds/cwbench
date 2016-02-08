@@ -10,28 +10,28 @@ import (
 )
 
 type APIKey struct {
-	UserId string `sql:"index"`
-	Key    string `sql:"index"`
+	UserId string
+	Key    string
 }
 
 type Project struct {
 	Id        int64 `gorm:"primary_key"`
 	CreatedAt time.Time
-	UserId    string `sql:"index"`
+	UserId    string
 	Name      string
 	Public    bool
 }
 
 type Dimension struct {
 	Id        int64 `gorm:"primary_key"`
-	ProjectId int64 `sql:"index"`
+	ProjectId int64
 	Name      string
 }
 
 type DiffExp struct {
 	Id        int64 `gorm:"primary_key"`
 	CreatedAt time.Time
-	ProjectId int64 `sql:"index"`
+	ProjectId int64
 	Name      string
 }
 
@@ -45,7 +45,7 @@ type DiffExpValue struct {
 type Control struct {
 	Id        int64 `gorm:"primary_key"`
 	CreatedAt time.Time
-	ProjectId int64 `sql:"index"`
+	ProjectId int64
 	Name      string
 }
 
@@ -55,9 +55,9 @@ type ControlValue struct {
 	Rank        int
 }
 
-func (a *App) CreateDB() error {
+func (d *Data) CreateDB() error {
 	var errs errors.ErrorGroup
-	tx := a.db.Begin()
+	tx := d.db.Begin()
 
 	errs.Add(tx.Exec(`CREATE TABLE
 	  api_keys (
