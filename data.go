@@ -336,6 +336,17 @@ func (d *Data) Control(user_id string, project_id, control_id int64) (
 	return proj, control, read_only, err
 }
 
+func (d *Data) ControlByName(project_id int64, name string) (
+	control *Control, err error) {
+	control = &Control{}
+	err = ErrNotFound.Wrap(d.db.Where("project_id = ? AND name = ?",
+		project_id, name).First(control).Error)
+	if err != nil {
+		return nil, err
+	}
+	return control, nil
+}
+
 func Ranked(count int,
 	values func(deliver func(dim_id int64, value float64) error) error) (
 	ranked func(deliver func(dim_id int64, rank int) error) error) {

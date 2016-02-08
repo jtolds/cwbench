@@ -21,6 +21,8 @@ var (
 	projectId = webhelp.NewIntArgMux()
 	controlId = webhelp.NewIntArgMux()
 	diffExpId = webhelp.NewIntArgMux()
+
+	controlName = webhelp.NewStringArgMux()
 )
 
 func main() {
@@ -84,6 +86,13 @@ func main() {
 										renderer.Process(endpoints.NewSample))),
 								},
 							),
+
+							"control_named": controlName.OptShift(
+								webhelp.ExactGet(ProjectRedirector),
+								webhelp.DirMux{
+									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
+										renderer.Process(endpoints.NewSampleFromName))),
+								}),
 
 							"search": webhelp.ExactMethod("POST",
 								webhelp.ExactPath(renderer.Render(endpoints.Search)),

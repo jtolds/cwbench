@@ -254,9 +254,23 @@ func (a *Endpoints) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 
 func (a *Endpoints) NewSample(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo) error {
+	return a.newSample(ctx, w, req, user, projectId.Get(ctx), controlId.Get(ctx))
+}
 
+func (a *Endpoints) NewSampleFromName(ctx context.Context,
+	w webhelp.ResponseWriter, req *http.Request, user *UserInfo) error {
 	proj_id := projectId.Get(ctx)
-	diffexp_id, err := a.Data.NewSample(user.Id, proj_id, controlId.Get(ctx),
+	control, err := a.Data.ControlByName(proj_id, controlName.Get(ctx))
+	if err != nil {
+		return err
+	}
+	return a.newSample(ctx, w, req, user, proj_id, control.Id)
+}
+
+func (a *Endpoints) newSample(ctx context.Context, w webhelp.ResponseWriter,
+	req *http.Request, user *UserInfo, proj_id, control_id int64) error {
+
+	diffexp_id, err := a.Data.NewSample(user.Id, proj_id, control_id,
 		req.FormValue("name"),
 		func(deliver func(dim_id int64, value float64) error) error {
 			dimlookup, err := a.Data.DimLookup(proj_id)
