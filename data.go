@@ -513,8 +513,14 @@ func (d *Data) TopKSearch(proj_id int64, up, down []int64, k int) (
 			if up_lookup[id] {
 				val.Score += 1
 			}
+			if down_lookup[id] {
+				val.Score -= 1
+			}
 		}
 		for _, id := range other_down {
+			if up_lookup[id] {
+				val.Score -= 1
+			}
 			if down_lookup[id] {
 				val.Score += 1
 			}
