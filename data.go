@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"math"
+	"runtime"
 	"sort"
 	"sync"
 
@@ -21,16 +22,15 @@ import (
 var (
 	dbType = flag.String("db", "sqlite3", "the database type to use. "+
 		"can be postgres or sqlite3")
-	dbConn = flag.String("db.conn", "./db.db", "the database connection string")
+	dbConn = flag.String("db.conn", "./db.db",
+		"the database connection string")
+	searchParallelism = flag.Int("parallelism", runtime.NumCPU()+1,
+		"number of parellel search queries to execute")
 
 	Err         = errors.NewClass("error")
 	ErrNotFound = Err.NewClass("not found", errhttp.SetStatusCode(404))
 	ErrDenied   = Err.NewClass("denied", errhttp.SetStatusCode(405))
 	ErrBadDims  = Err.NewClass("wrong dimensions", errhttp.SetStatusCode(400))
-)
-
-const (
-	searchParallelism = 6
 )
 
 type Data struct {
@@ -517,8 +517,8 @@ func (d *Data) TopKSearch(proj_id int64, up, down []int64, k int) (
 	var result_errs errors.ErrorGroup
 	diffexps_ch := make(chan DiffExp)
 
-	wg.Add(searchParallelism)
-	for i := 0; i < searchParallelism; i++ {
+	wg.Add(*searchParallelism)
+	for i := 0; i < *searchParallelism; i++ {
 		go func() {
 			defer wg.Done()
 			for diffexp := range diffexps_ch {
