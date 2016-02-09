@@ -9,7 +9,9 @@ import (
 
 var (
 	Templates = template.New("root").Funcs(
-		template.FuncMap{"makepair": makePair})
+		template.FuncMap{
+			"makepair": makePair,
+			"safeURL":  func(val string) template.URL { return template.URL(val) }})
 )
 
 type Pair struct {

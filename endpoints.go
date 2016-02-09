@@ -6,11 +6,16 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/jtolds/webhelp"
 	"golang.org/x/net/context"
+)
+
+const (
+	DefaultLimit = 25
 )
 
 type Endpoints struct {
@@ -166,7 +171,7 @@ func (a *Endpoints) DiffExpSimilar(ctx context.Context, req *http.Request,
 
 	limit, err := strconv.Atoi(req.FormValue("k"))
 	if err != nil {
-		return "", nil, webhelp.ErrBadRequest.New("missing numerical k query param")
+		limit = DefaultLimit
 	}
 
 	up_regulated, down_regulated, err := a.Data.TopKSignature(diffexp.Id, limit)
@@ -174,8 +179,16 @@ func (a *Endpoints) DiffExpSimilar(ctx context.Context, req *http.Request,
 		return "", nil, err
 	}
 
-	results, err := a.Data.TopKSearch(proj.Id, up_regulated, down_regulated,
-		limit)
+	var results SearchResults
+	search_type := req.FormValue("search-type")
+	switch search_type {
+	case "kolmogorov":
+		results, err = a.Data.KSSearch(proj.Id, up_regulated, down_regulated)
+	default:
+		search_type = "topk"
+		results, err = a.Data.TopKSearch(proj.Id, up_regulated, down_regulated,
+			limit)
+	}
 	if err != nil {
 		return "", nil, err
 	}
@@ -184,7 +197,9 @@ func (a *Endpoints) DiffExpSimilar(ctx context.Context, req *http.Request,
 		"Project": proj,
 		"DiffExp": diffexp,
 		"Results": results,
-		"K":       limit}, nil
+		"Params": url.Values{
+			"k":           []string{fmt.Sprint(limit)},
+			"search-type": []string{search_type}}.Encode()}, nil
 }
 
 func (a *Endpoints) Control(ctx context.Context, req *http.Request,
@@ -315,10 +330,6 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 
 	up_regulated_strings := strings.Fields(req.FormValue("up-regulated"))
 	down_regulated_strings := strings.Fields(req.FormValue("down-regulated"))
-	limit, err := strconv.Atoi(req.FormValue("k"))
-	if err != nil {
-		return "", nil, webhelp.ErrBadRequest.New("invalid k parameter")
-	}
 	if len(up_regulated_strings)+len(down_regulated_strings) == 0 {
 		return "", nil, webhelp.ErrBadRequest.New("no dimensions provided")
 	}
@@ -355,8 +366,20 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 		down_regulated = append(down_regulated, id)
 	}
 
-	results, err := a.Data.TopKSearch(proj.Id, up_regulated, down_regulated,
-		limit)
+	var results SearchResults
+	switch req.FormValue("search-type") {
+	case "kolmogorov":
+		results, err = a.Data.KSSearch(proj.Id, up_regulated, down_regulated)
+	case "topk":
+		limit, err := strconv.Atoi(req.FormValue("k"))
+		if err != nil {
+			return "", nil, webhelp.ErrBadRequest.New("invalid k parameter")
+		}
+		results, err = a.Data.TopKSearch(proj.Id, up_regulated, down_regulated,
+			limit)
+	default:
+		return "", nil, webhelp.ErrBadRequest.New("invalid search-type parameter")
+	}
 	if err != nil {
 		return "", nil, err
 	}

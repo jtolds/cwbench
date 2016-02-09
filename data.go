@@ -456,119 +456,10 @@ func (p rankList) Rank(cb func(entry rankEntry, rank int) error) error {
 	return nil
 }
 
-func (d *Data) TopKSignature(diffexp_id int64, k int) (
-	up, down []int64, err error) {
-	var values []DiffExpValue
-	err = d.db.Where("diff_exp_id = ?", diffexp_id).Order(
-		"abs_diff desc").Limit(k).Find(&values).Error
-	if err != nil {
-		return nil, nil, Err.Wrap(err)
-	}
-
-	for _, val := range values {
-		if val.Diff < 0 {
-			down = append(down, val.DimensionId)
-		}
-		if val.Diff > 0 {
-			up = append(up, val.DimensionId)
-		}
-	}
-
-	return up, down, nil
-}
-
 func (d *Data) ControlValues(control_id int64) (
 	values []ControlValue, err error) {
 	return values, Err.Wrap(d.db.Where(
 		"control_id = ?", control_id).Order("rank desc").Find(&values).Error)
-}
-
-type SearchResult struct {
-	DiffExp
-	Score int
-}
-
-type SearchResults []SearchResult
-
-func (l SearchResults) Len() int           { return len(l) }
-func (l SearchResults) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
-func (l SearchResults) Less(i, j int) bool { return l[i].Score > l[j].Score }
-
-func (d *Data) TopKSearch(proj_id int64, up, down []int64, k int) (
-	result SearchResults, err error) {
-	var diffexps []DiffExp
-	err = d.db.Where("project_id = ?", proj_id).Find(&diffexps).Error
-	if err != nil {
-		return nil, Err.Wrap(err)
-	}
-
-	up_lookup := make(map[int64]bool, len(up))
-	down_lookup := make(map[int64]bool, len(down))
-	for _, id := range up {
-		up_lookup[id] = true
-	}
-	for _, id := range down {
-		down_lookup[id] = true
-	}
-
-	var wg sync.WaitGroup
-	var result_mtx sync.Mutex
-	result = make(SearchResults, 0, len(diffexps))
-	var result_errs errors.ErrorGroup
-	diffexps_ch := make(chan DiffExp)
-
-	wg.Add(*searchParallelism)
-	for i := 0; i < *searchParallelism; i++ {
-		go func() {
-			defer wg.Done()
-			for diffexp := range diffexps_ch {
-				val, err := func() (SearchResult, error) {
-					other_up, other_down, err := d.TopKSignature(diffexp.Id, k)
-					if err != nil {
-						return SearchResult{}, err
-					}
-					val := SearchResult{DiffExp: diffexp}
-					for _, id := range other_up {
-						if up_lookup[id] {
-							val.Score += 1
-						}
-						if down_lookup[id] {
-							val.Score -= 1
-						}
-					}
-					for _, id := range other_down {
-						if up_lookup[id] {
-							val.Score -= 1
-						}
-						if down_lookup[id] {
-							val.Score += 1
-						}
-					}
-					return val, nil
-				}()
-				result_mtx.Lock()
-				result_errs.Add(err)
-				if err == nil {
-					result = append(result, val)
-				}
-				result_mtx.Unlock()
-			}
-		}()
-	}
-
-	for _, diffexp := range diffexps {
-		diffexps_ch <- diffexp
-	}
-	close(diffexps_ch)
-	wg.Wait()
-
-	err = result_errs.Finalize()
-	if err != nil {
-		return nil, err
-	}
-
-	sort.Sort(result)
-	return result, nil
 }
 
 func (d *Data) NewSample(user_id string, project_id, control_id int64,
@@ -606,4 +497,161 @@ func (d *Data) NewSample(user_id string, project_id, control_id int64,
 				return deliver(dim_id, rank-control_rank)
 			})
 		})
+}
+
+func (d *Data) TopKSignature(diffexp_id int64, k int) (
+	up, down []int64, err error) {
+	var values []DiffExpValue
+	err = d.db.Where("diff_exp_id = ?", diffexp_id).Order(
+		"abs_diff desc").Limit(k).Find(&values).Error
+	if err != nil {
+		return nil, nil, Err.Wrap(err)
+	}
+
+	for _, val := range values {
+		if val.Diff < 0 {
+			down = append(down, val.DimensionId)
+		}
+		if val.Diff > 0 {
+			up = append(up, val.DimensionId)
+		}
+	}
+
+	return up, down, nil
+}
+
+type SearchResult struct {
+	DiffExp
+	Score float64
+}
+
+type SearchResults []SearchResult
+
+func (l SearchResults) Len() int           { return len(l) }
+func (l SearchResults) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+func (l SearchResults) Less(i, j int) bool { return l[i].Score > l[j].Score }
+
+func (d *Data) search(proj_id int64,
+	scoreFunc func(diffexp_id int64) (score float64, err error)) (
+	SearchResults, error) {
+
+	var diffexps []DiffExp
+	err := d.db.Where("project_id = ?", proj_id).Find(&diffexps).Error
+	if err != nil {
+		return nil, Err.Wrap(err)
+	}
+
+	var wg sync.WaitGroup
+	var result_mtx sync.Mutex
+	result := make(SearchResults, 0, len(diffexps))
+	var result_errs errors.ErrorGroup
+	diffexps_ch := make(chan DiffExp)
+
+	wg.Add(*searchParallelism)
+	for i := 0; i < *searchParallelism; i++ {
+		go func() {
+			defer wg.Done()
+			for diffexp := range diffexps_ch {
+				val, err := scoreFunc(diffexp.Id)
+				result_mtx.Lock()
+				result_errs.Add(err)
+				if err == nil {
+					result = append(result, SearchResult{DiffExp: diffexp, Score: val})
+				}
+				result_mtx.Unlock()
+			}
+		}()
+	}
+
+	for _, diffexp := range diffexps {
+		diffexps_ch <- diffexp
+	}
+	close(diffexps_ch)
+	wg.Wait()
+
+	err = result_errs.Finalize()
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Sort(result)
+	return result, nil
+}
+
+func (d *Data) TopKSearch(proj_id int64, up, down []int64, k int) (
+	result SearchResults, err error) {
+	up_lookup := make(map[int64]bool, len(up))
+	down_lookup := make(map[int64]bool, len(down))
+	for _, id := range up {
+		up_lookup[id] = true
+	}
+	for _, id := range down {
+		down_lookup[id] = true
+	}
+	return d.search(proj_id, func(diffexp_id int64) (float64, error) {
+		other_up, other_down, err := d.TopKSignature(diffexp_id, k)
+		if err != nil {
+			return math.NaN(), err
+		}
+		val := 0
+		for _, id := range other_up {
+			if up_lookup[id] {
+				val += 1
+			}
+			if down_lookup[id] {
+				val -= 1
+			}
+		}
+		for _, id := range other_down {
+			if up_lookup[id] {
+				val -= 1
+			}
+			if down_lookup[id] {
+				val += 1
+			}
+		}
+		return float64(val), nil
+	})
+}
+
+func (d *Data) KSSearch(proj_id int64, up, down []int64) (
+	result SearchResults, err error) {
+	up_lookup := make(map[int64]bool, len(up))
+	down_lookup := make(map[int64]bool, len(down))
+	for _, id := range up {
+		up_lookup[id] = true
+	}
+	for _, id := range down {
+		down_lookup[id] = true
+	}
+	return d.search(proj_id, func(diffexp_id int64) (float64, error) {
+		var values []DiffExpValue
+		err = d.db.Where("diff_exp_id = ?", diffexp_id).Order(
+			"diff desc").Find(&values).Error
+		if err != nil {
+			return math.NaN(), err
+		}
+		distance := 0
+		max_distance := math.Inf(-1)
+		for _, val := range values {
+			if val.Diff >= 0 {
+				if up_lookup[val.DimensionId] {
+					distance += 1
+				} else {
+					distance -= 1
+				}
+			} else {
+				if down_lookup[val.DimensionId] {
+					distance += 1
+				} else {
+					distance -= 1
+				}
+			}
+			newdist := math.Abs(float64(distance))
+			if newdist > max_distance {
+				max_distance = newdist
+			}
+		}
+		return max_distance, nil
+	})
 }

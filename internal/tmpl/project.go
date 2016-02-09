@@ -17,12 +17,12 @@ func init() {
     <a href="#topk" aria-controls="topk" role="tab" data-toggle="tab">Top-k</a>
   </li>
   <li role="presentation">
-    <a href="#kbarcoding" aria-controls="kbarcoding" role="tab"
-      data-toggle="tab">k-Barcoding</a>
-  </li>
-  <li role="presentation">
     <a href="#kolmogorov" aria-controls="kolmogorov" role="tab"
       data-toggle="tab">Kolmogorov-Smirnov</a>
+  </li>
+  <li role="presentation">
+    <a href="#kbarcoding" aria-controls="kbarcoding" role="tab"
+      data-toggle="tab">k-Barcoding</a>
   </li>
 </ul>
 
@@ -52,6 +52,31 @@ func init() {
     <input type="number" name="k" class="form-control" id="topkInput"
       value="25" />
   </div>
+  <input type="hidden" name="search-type" value="topk" />
+  <button type="submit" class="btn btn-default">Search</button>
+</div>
+</div>
+</form>
+
+  </div>
+  <div role="tabpanel" id="kolmogorov" class="tab-pane fade">
+
+<form method="POST" action="/project/{{.Page.Project.Id}}/search">
+<div class="row">
+<div class="col-md-6">
+  <textarea name="up-regulated" class="form-control" rows="3"
+      placeholder="up-regulated dimensions (whitespace separated)"></textarea>
+  <br/>
+</div>
+<div class="col-md-6">
+  <textarea name="down-regulated" class="form-control" rows="3"
+      placeholder="down-regulated dimensions (whitespace separated)"></textarea>
+  <br/>
+</div>
+</div>
+<div class="row">
+<div class="col-md-12 form-inline" style="text-align:right;">
+  <input type="hidden" name="search-type" value="kolmogorov" />
   <button type="submit" class="btn btn-default">Search</button>
 </div>
 </div>
@@ -59,9 +84,6 @@ func init() {
 
   </div>
   <div role="tabpanel" id="kbarcoding" class="tab-pane fade">
-  Not yet implemented
-  </div>
-  <div role="tabpanel" id="kolmogorov" class="tab-pane fade">
   Not yet implemented
   </div>
 </div>

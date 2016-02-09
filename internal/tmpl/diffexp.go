@@ -15,7 +15,7 @@ func init() {
     <a>Data</a>
   </li>
   <li role="presentation">
-    <a href="/project/{{.Page.Project.Id}}/diffexp/{{.Page.DiffExp.Id}}/similar?k=25">Similar Samples</a>
+    <a href="/project/{{.Page.Project.Id}}/diffexp/{{.Page.DiffExp.Id}}/similar">Similar Samples</a>
   </li>
 </ul>
 
