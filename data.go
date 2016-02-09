@@ -9,6 +9,7 @@ import (
 	"flag"
 	"math"
 	"sort"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
@@ -26,6 +27,10 @@ var (
 	ErrNotFound = Err.NewClass("not found", errhttp.SetStatusCode(404))
 	ErrDenied   = Err.NewClass("denied", errhttp.SetStatusCode(405))
 	ErrBadDims  = Err.NewClass("wrong dimensions", errhttp.SetStatusCode(400))
+)
+
+const (
+	searchParallelism = 6
 )
 
 type Data struct {
@@ -506,30 +511,60 @@ func (d *Data) TopKSearch(proj_id int64, up, down []int64, k int) (
 		down_lookup[id] = true
 	}
 
+	var wg sync.WaitGroup
+	var result_mtx sync.Mutex
 	result = make(SearchResults, 0, len(diffexps))
+	var result_errs errors.ErrorGroup
+	diffexps_ch := make(chan DiffExp)
+
+	wg.Add(searchParallelism)
+	for i := 0; i < searchParallelism; i++ {
+		go func() {
+			defer wg.Done()
+			for diffexp := range diffexps_ch {
+				val, err := func() (SearchResult, error) {
+					other_up, other_down, err := d.TopKSignature(diffexp.Id, k)
+					if err != nil {
+						return SearchResult{}, err
+					}
+					val := SearchResult{DiffExp: diffexp}
+					for _, id := range other_up {
+						if up_lookup[id] {
+							val.Score += 1
+						}
+						if down_lookup[id] {
+							val.Score -= 1
+						}
+					}
+					for _, id := range other_down {
+						if up_lookup[id] {
+							val.Score -= 1
+						}
+						if down_lookup[id] {
+							val.Score += 1
+						}
+					}
+					return val, nil
+				}()
+				result_mtx.Lock()
+				result_errs.Add(err)
+				if err == nil {
+					result = append(result, val)
+				}
+				result_mtx.Unlock()
+			}
+		}()
+	}
+
 	for _, diffexp := range diffexps {
-		other_up, other_down, err := d.TopKSignature(diffexp.Id, k)
-		if err != nil {
-			return nil, err
-		}
-		val := SearchResult{DiffExp: diffexp}
-		for _, id := range other_up {
-			if up_lookup[id] {
-				val.Score += 1
-			}
-			if down_lookup[id] {
-				val.Score -= 1
-			}
-		}
-		for _, id := range other_down {
-			if up_lookup[id] {
-				val.Score -= 1
-			}
-			if down_lookup[id] {
-				val.Score += 1
-			}
-		}
-		result = append(result, val)
+		diffexps_ch <- diffexp
+	}
+	close(diffexps_ch)
+	wg.Wait()
+
+	err = result_errs.Finalize()
+	if err != nil {
+		return nil, err
 	}
 
 	sort.Sort(result)
