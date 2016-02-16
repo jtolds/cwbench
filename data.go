@@ -277,11 +277,11 @@ func (d *Data) DiffExp(user_id string, project_id, diff_exp_id int64) (
 func (d *Data) DiffExpValues(diffexp_id int64) (
 	values []DiffExpValue, err error) {
 	return values, Err.Wrap(d.db.Where(
-		"diff_exp_id = ?", diffexp_id).Order("diff desc").Find(&values).Error)
+		"diff_exp_id = ?", diffexp_id).Order("rank_diff desc").Find(&values).Error)
 }
 
 func (d *Data) NewDiffExp(user_id string, project_id int64, name string,
-	values func(deliver func(dim_id int64, diff int) error) error) (
+	values func(func(dim_id int64, value, rank_diff float64) error) error) (
 	diffexp_id int64, err error) {
 
 	err = d.AssertWriteAccess(user_id, project_id, nil)
@@ -304,20 +304,21 @@ func (d *Data) NewDiffExp(user_id string, project_id int64, name string,
 	}
 
 	seen := make(map[int64]bool, count)
-	err = values(func(dim_id int64, diff int) error {
+	err = values(func(dim_id int64, value, rank_diff float64) error {
 		if seen[dim_id] {
 			return ErrBadDims.New("duplicated dimension")
 		}
 		seen[dim_id] = true
-		abs_diff := diff
-		if abs_diff < 0 {
-			abs_diff *= -1
+		abs_rank_diff := rank_diff
+		if abs_rank_diff < 0 {
+			abs_rank_diff *= -1
 		}
 		return Err.Wrap(tx.Create(&DiffExpValue{
 			DiffExpId:   diffexp.Id,
 			DimensionId: dim_id,
-			Diff:        diff,
-			AbsDiff:     abs_diff}).Error)
+			SampleValue: value,
+			RankDiff:    rank_diff,
+			AbsRankDiff: abs_rank_diff}).Error)
 	})
 	if err != nil {
 		return 0, err
@@ -357,9 +358,9 @@ func (d *Data) ControlByName(project_id int64, name string) (
 }
 
 func Ranked(count int,
-	values func(deliver func(dim_id int64, value float64) error) error) (
-	ranked func(deliver func(dim_id int64, rank int) error) error) {
-	return func(deliver func(dim_id int64, rank int) error) error {
+	values func(func(dim_id int64, value float64) error) error) (
+	ranked func(func(dim_id int64, value float64, rank int) error) error) {
+	return func(deliv func(dim_id int64, value float64, rank int) error) error {
 		seen := make(map[int64]bool, count)
 		tosort := make(rankList, 0, count)
 
@@ -381,8 +382,8 @@ func Ranked(count int,
 				"submission dimensions don't match project dimensions")
 		}
 
-		return tosort.Rank(func(entry rankEntry, rank int) error {
-			return deliver(entry.id, rank)
+		return tosort.Rank(func(entry rankEntry, value float64, rank int) error {
+			return deliv(entry.id, value, rank)
 		})
 	}
 }
@@ -410,12 +411,14 @@ func (d *Data) NewControl(user_id string, project_id int64, name string,
 		return 0, err
 	}
 
-	err = Ranked(count, values)(func(dim_id int64, rank int) error {
-		return Err.Wrap(tx.Create(&ControlValue{
-			ControlId:   control.Id,
-			DimensionId: dim_id,
-			Rank:        rank}).Error)
-	})
+	err = Ranked(count, values)(
+		func(dim_id int64, value float64, rank int) error {
+			return Err.Wrap(tx.Create(&ControlValue{
+				ControlId:   control.Id,
+				DimensionId: dim_id,
+				Value:       value,
+				Rank:        rank}).Error)
+		})
 	if err != nil {
 		return 0, err
 	}
@@ -436,7 +439,8 @@ func (p rankList) Less(i, j int) bool {
 	return p[i].val < p[j].val || math.IsNaN(p[i].val) && !math.IsNaN(p[j].val)
 }
 
-func (p rankList) Rank(cb func(entry rankEntry, rank int) error) error {
+func (p rankList) Rank(
+	cb func(entry rankEntry, value float64, rank int) error) error {
 	sort.Sort(p)
 	last_rank := 1
 	last_val := math.Inf(-1)
@@ -448,7 +452,7 @@ func (p rankList) Rank(cb func(entry rankEntry, rank int) error) error {
 			last_val = entry.val
 			last_rank = rank
 		}
-		err := cb(entry, rank)
+		err := cb(entry, entry.val, rank)
 		if err != nil {
 			return err
 		}
@@ -477,24 +481,37 @@ func (d *Data) NewSample(user_id string, project_id, control_id int64,
 		return 0, err
 	}
 
-	control_lookup := make(map[int64]int, len(control_values))
-	for _, val := range control_values {
-		control_lookup[val.DimensionId] = val.Rank
+	control_lookup := make(map[int64]*ControlValue, len(control_values))
+	for i := range control_values {
+		control_lookup[control_values[i].DimensionId] = &control_values[i]
 	}
-	control_values = nil
 
 	return d.NewDiffExp(user_id, project_id, name,
-		func(deliver func(dim_id int64, diff int) error) error {
-			count, err := d.DimCount(project_id)
-			if err != nil {
-				return err
-			}
-			return Ranked(count, values)(func(dim_id int64, rank int) error {
-				control_rank, exists := control_lookup[dim_id]
+		func(deliver func(dim_id int64, value, rank_diff float64) error) error {
+			return values(func(dim_id int64, value float64) error {
+				control, exists := control_lookup[dim_id]
 				if !exists {
 					return ErrBadDims.New("dimension mismatch")
 				}
-				return deliver(dim_id, rank-control_rank)
+
+				quantile_idx := sort.Search(len(control_values), func(i int) bool {
+					// control_values is in rank descending order
+					return control_values[i].Value <= value
+				})
+
+				new_rank := float64(0)
+				if quantile_idx < len(control_values) {
+					found_control := control_values[quantile_idx]
+					new_rank = float64(found_control.Rank)
+					if quantile_idx > 0 {
+						new_rank += (value - found_control.Value) /
+							(control_values[quantile_idx-1].Value - found_control.Value)
+					} else if value > found_control.Value {
+						new_rank += 1
+					}
+				}
+
+				return deliver(dim_id, value, new_rank-float64(control.Rank))
 			})
 		})
 }
@@ -503,16 +520,16 @@ func (d *Data) TopKSignature(diffexp_id int64, k int) (
 	up, down []int64, err error) {
 	var values []DiffExpValue
 	err = d.db.Where("diff_exp_id = ?", diffexp_id).Order(
-		"abs_diff desc").Limit(k).Find(&values).Error
+		"abs_rank_diff desc").Limit(k).Find(&values).Error
 	if err != nil {
 		return nil, nil, Err.Wrap(err)
 	}
 
 	for _, val := range values {
-		if val.Diff < 0 {
+		if val.RankDiff < 0 {
 			down = append(down, val.DimensionId)
 		}
-		if val.Diff > 0 {
+		if val.RankDiff > 0 {
 			up = append(up, val.DimensionId)
 		}
 	}
@@ -616,6 +633,8 @@ func (d *Data) TopKSearch(proj_id int64, up, down []int64, k int) (
 
 func (d *Data) KSSearch(proj_id int64, up, down []int64) (
 	result SearchResults, err error) {
+	return nil, errors.NotImplementedError.New("TODO")
+
 	up_lookup := make(map[int64]bool, len(up))
 	down_lookup := make(map[int64]bool, len(down))
 	for _, id := range up {
@@ -624,6 +643,7 @@ func (d *Data) KSSearch(proj_id int64, up, down []int64) (
 	for _, id := range down {
 		down_lookup[id] = true
 	}
+
 	return d.search(proj_id, func(diffexp_id int64) (float64, error) {
 		var values []DiffExpValue
 		err = d.db.Where("diff_exp_id = ?", diffexp_id).Order(
@@ -634,7 +654,7 @@ func (d *Data) KSSearch(proj_id int64, up, down []int64) (
 		distance := 0
 		max_distance := math.Inf(-1)
 		for _, val := range values {
-			if val.Diff >= 0 {
+			if val.RankDiff >= 0 {
 				if up_lookup[val.DimensionId] {
 					distance += 1
 				} else {

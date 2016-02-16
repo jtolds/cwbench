@@ -23,10 +23,14 @@ func init() {
   <div class="panel-body">
 
 <table class="table table-striped">
-<tr><th>Dimension</th><th>Rank difference</th></tr>
+<tr><th>Dimension</th><th>Sample Value</th><th>Rank difference</th></tr>
 {{ $lookup := .Page.Lookup }}
 {{ range .Page.Values }}
-<tr><td>{{($lookup.LookupName .DimensionId)}}</td><td>{{.Diff}}</td></tr>
+<tr>
+  <td>{{($lookup.LookupName .DimensionId)}}</td>
+  <td>{{.SampleValue}}</td>
+  <td>{{.RankDiff}}</td>
+</tr>
 {{ end }}
 </table>
 

@@ -29,10 +29,14 @@ func init() {
   <div role="tabpanel" id="ranks" class="tab-pane fade in active">
 
 <table class="table table-striped">
-<tr><th>Dimension</th><th>Rank</th></tr>
+<tr><th>Dimension</th><th>Value</th><th>Rank</th></tr>
 {{ $lookup := .Page.Lookup }}
 {{ range .Page.Values }}
-<tr><td>{{($lookup.LookupName .DimensionId)}}</td><td>{{.Rank}}</td></tr>
+<tr>
+  <td>{{($lookup.LookupName .DimensionId)}}</td>
+  <td>{{.Value}}</td>
+  <td>{{.Rank}}</td>
+</tr>
 {{ end }}
 </table>
 

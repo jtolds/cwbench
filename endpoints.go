@@ -100,7 +100,7 @@ func (a *Endpoints) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo) error {
 	proj_id := projectId.Get(ctx)
 	diffexp_id, err := a.Data.NewDiffExp(user.Id, proj_id, req.FormValue("name"),
-		func(deliver func(dim_id int64, diff int) error) error {
+		func(deliver func(dim_id int64, value, rank_diff float64) error) error {
 			dimlookup, err := a.Data.DimLookup(proj_id)
 			if err != nil {
 				return err
@@ -111,19 +111,23 @@ func (a *Endpoints) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
 				if len(fields) == 0 {
 					continue
 				}
-				if len(fields) != 2 {
+				if len(fields) != 3 {
 					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
 				}
 				id, err := dimlookup.LookupId(fields[0])
 				if err != nil {
 					return err
 				}
-				val, err := strconv.Atoi(fields[1])
+				val, err := strconv.ParseFloat(fields[1], 64)
+				if err != nil {
+					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
+				}
+				rank_diff, err := strconv.ParseFloat(fields[1], 64)
 				if err != nil {
 					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
 				}
 
-				err = deliver(id, val)
+				err = deliver(id, val, rank_diff)
 				if err != nil {
 					return err
 				}

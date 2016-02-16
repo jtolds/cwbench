@@ -61,6 +61,7 @@ func init() {
   </div>
   <div role="tabpanel" id="kolmogorov" class="tab-pane fade">
 
+<!--
 <form method="POST" action="/project/{{.Page.Project.Id}}/search">
 <div class="row">
 <div class="col-md-6">
@@ -81,6 +82,8 @@ func init() {
 </div>
 </div>
 </form>
+-->
+Not yet implemented
 
   </div>
   <div role="tabpanel" id="kbarcoding" class="tab-pane fade">

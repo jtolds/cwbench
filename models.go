@@ -38,8 +38,9 @@ type DiffExp struct {
 type DiffExpValue struct {
 	DiffExpId   int64
 	DimensionId int64
-	Diff        int
-	AbsDiff     int
+	RankDiff    float64
+	AbsRankDiff float64
+	SampleValue float64
 }
 
 type Control struct {
@@ -52,6 +53,7 @@ type Control struct {
 type ControlValue struct {
 	ControlId   int64
 	DimensionId int64
+	Value       float64
 	Rank        int
 }
 
@@ -105,16 +107,17 @@ func (d *Data) CreateDB() error {
     diff_exp_values (
       diff_exp_id bigint,
       dimension_id bigint,
-      diff integer,
-      abs_diff integer,
+      rank_diff real,
+      abs_rank_diff real,
+      sample_value real,
       primary key(diff_exp_id, dimension_id)
     );`).Error)
 	errs.Add(tx.Exec(`CREATE INDEX
-	  idx_diff_exp_values_diff_exp_id_abs_diff ON
-	      diff_exp_values(diff_exp_id, abs_diff);`).Error)
+	  idx_diff_exp_values_diff_exp_id_abs_rank_diff ON
+	      diff_exp_values(diff_exp_id, abs_rank_diff);`).Error)
 	errs.Add(tx.Exec(`CREATE INDEX
-	  idx_diff_exp_values_diff_exp_id_diff ON
-	      diff_exp_values(diff_exp_id, diff);`).Error)
+	  idx_diff_exp_values_diff_exp_id_rank_diff ON
+	      diff_exp_values(diff_exp_id, rank_diff);`).Error)
 
 	errs.Add(tx.Exec(`CREATE TABLE
     controls (
@@ -130,7 +133,8 @@ func (d *Data) CreateDB() error {
     control_values (
       control_id bigint,
       dimension_id bigint,
-      rank integer,
+      rank int,
+      value real,
       primary key(control_id, dimension_id)
     );`).Error)
 	errs.Add(tx.Exec(`CREATE INDEX
