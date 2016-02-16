@@ -20,7 +20,7 @@ var (
 
 	projectId = webhelp.NewIntArgMux()
 	controlId = webhelp.NewIntArgMux()
-	diffExpId = webhelp.NewIntArgMux()
+	sampleId  = webhelp.NewIntArgMux()
 
 	controlName = webhelp.NewStringArgMux()
 )
@@ -62,15 +62,14 @@ func main() {
 						webhelp.DirMux{
 							"": webhelp.Exact(renderer.Render(endpoints.Project)),
 
-							"diffexp": diffExpId.OptShift(
+							"sample": sampleId.OptShift(
 								webhelp.ExactPath(webhelp.MethodMux{
-									"GET":  ProjectRedirector,
-									"POST": renderer.Process(endpoints.NewDiffExp),
+									"GET": ProjectRedirector,
 								}),
 								webhelp.DirMux{
-									"": webhelp.ExactGet(renderer.Render(endpoints.DiffExp)),
+									"": webhelp.ExactGet(renderer.Render(endpoints.Sample)),
 									"similar": webhelp.ExactGet(
-										renderer.Render(endpoints.DiffExpSimilar)),
+										renderer.Render(endpoints.SampleSimilar)),
 								},
 							),
 

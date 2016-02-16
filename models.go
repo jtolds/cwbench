@@ -28,19 +28,25 @@ type Dimension struct {
 	Name      string
 }
 
-type DiffExp struct {
+type Sample struct {
 	Id        int64 `gorm:"primary_key"`
+	ControlId int64
 	CreatedAt time.Time
 	ProjectId int64
 	Name      string
 }
 
-type DiffExpValue struct {
-	DiffExpId   int64
+type SampleValue struct {
+	SampleId    int64
 	DimensionId int64
-	RankDiff    float64
-	AbsRankDiff float64
-	SampleValue float64
+
+	Rank        int
+	RankDiff    int
+	AbsRankDiff int
+
+	Value        float64
+	ValueDiff    float64
+	AbsValueDiff float64
 }
 
 type Control struct {
@@ -95,32 +101,42 @@ func (d *Data) CreateDB() error {
 	errs.Add(tx.Exec(`CREATE UNIQUE INDEX
 	  idx_dimensions_project_id_name ON dimensions(project_id, name);`).Error)
 
-	errs.Add(tx.Exec(`CREATE SEQUENCE diff_exps_id_seq;`).Error)
+	errs.Add(tx.Exec(`CREATE SEQUENCE samples_id_seq;`).Error)
 	errs.Add(tx.Exec(`CREATE TABLE
-    diff_exps (
-      id bigint NOT NULL DEFAULT nextval('diff_exps_id_seq'),
+    samples (
+      id bigint NOT NULL DEFAULT nextval('samples_id_seq'),
+      control_id bigint NOT NULL,
       created_at timestamp with time zone NOT NULL,
       project_id bigint NOT NULL,
       name character varying(255) NOT NULL
     );`).Error)
 	errs.Add(tx.Exec(`CREATE UNIQUE INDEX
-	  idx_diff_exps_project_id_name ON diff_exps(project_id, name);`).Error)
+	  idx_samples_project_id_name ON samples(project_id, name);`).Error)
 
 	errs.Add(tx.Exec(`CREATE TABLE
-    diff_exp_values (
-      diff_exp_id bigint NOT NULL,
+    sample_values (
+      sample_id bigint NOT NULL,
       dimension_id bigint NOT NULL,
-      rank_diff real NOT NULL,
-      abs_rank_diff real NOT NULL,
-      sample_value real,
-      primary key(diff_exp_id, dimension_id)
+
+      rank integer NOT NULL,
+      rank_diff integer NOT NULL,
+      abs_rank_diff integer NOT NULL,
+
+      value real NOT NULL,
+      value_diff real NOT NULL,
+      abs_value_diff real NOT NULL,
+
+      primary key(sample_id, dimension_id)
     );`).Error)
 	errs.Add(tx.Exec(`CREATE INDEX
-	  idx_diff_exp_values_diff_exp_id_abs_rank_diff ON
-	      diff_exp_values(diff_exp_id, abs_rank_diff);`).Error)
+	  idx_sample_values_sample_id_abs_rank_diff ON
+	      sample_values(sample_id, abs_rank_diff);`).Error)
 	errs.Add(tx.Exec(`CREATE INDEX
-	  idx_diff_exp_values_diff_exp_id_rank_diff ON
-	      diff_exp_values(diff_exp_id, rank_diff);`).Error)
+	  idx_sample_values_sample_id_rank_diff ON
+	      sample_values(sample_id, rank_diff);`).Error)
+	errs.Add(tx.Exec(`CREATE INDEX
+	  idx_sample_values_sample_id_abs_value_diff ON
+	      sample_values(sample_id, abs_value_diff);`).Error)
 
 	errs.Add(tx.Exec(`CREATE SEQUENCE controls_id_seq;`).Error)
 	errs.Add(tx.Exec(`CREATE TABLE
@@ -137,7 +153,7 @@ func (d *Data) CreateDB() error {
     control_values (
       control_id bigint NOT NULL,
       dimension_id bigint NOT NULL,
-      rank int NOT NULL,
+      rank integer NOT NULL,
       value real NOT NULL,
       primary key(control_id, dimension_id)
     );`).Error)

@@ -65,7 +65,7 @@ func (a *Endpoints) Project(ctx context.Context, req *http.Request,
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
-	dimCount, diffexps, controls, err := a.Data.ProjectInfo(proj.Id)
+	dimCount, samples, controls, err := a.Data.ProjectInfo(proj.Id)
 	if err != nil {
 		return "", nil, err
 	}
@@ -73,7 +73,7 @@ func (a *Endpoints) Project(ctx context.Context, req *http.Request,
 		"Project":        proj,
 		"ReadOnly":       read_only,
 		"DimensionCount": dimCount,
-		"DiffExps":       diffexps,
+		"Samples":        samples,
 		"Controls":       controls,
 	}, nil
 }
@@ -96,60 +96,14 @@ func (a *Endpoints) NewProject(ctx context.Context, w webhelp.ResponseWriter,
 	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d", proj_id))
 }
 
-func (a *Endpoints) NewDiffExp(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo) error {
-	proj_id := projectId.Get(ctx)
-	diffexp_id, err := a.Data.NewDiffExp(user.Id, proj_id, req.FormValue("name"),
-		func(deliver func(dim_id int64, value, rank_diff float64) error) error {
-			dimlookup, err := a.Data.DimLookup(proj_id)
-			if err != nil {
-				return err
-			}
-
-			for _, row := range strings.Split(req.FormValue("values"), "\n") {
-				fields := strings.Fields(row)
-				if len(fields) == 0 {
-					continue
-				}
-				if len(fields) != 3 {
-					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
-				}
-				id, err := dimlookup.LookupId(fields[0])
-				if err != nil {
-					return err
-				}
-				val, err := strconv.ParseFloat(fields[1], 64)
-				if err != nil {
-					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
-				}
-				rank_diff, err := strconv.ParseFloat(fields[1], 64)
-				if err != nil {
-					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
-				}
-
-				err = deliver(id, val, rank_diff)
-				if err != nil {
-					return err
-				}
-			}
-
-			return nil
-		})
-	if err != nil {
-		return err
-	}
-	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/diffexp/%d",
-		proj_id, diffexp_id))
-}
-
-func (a *Endpoints) DiffExp(ctx context.Context, req *http.Request,
+func (a *Endpoints) Sample(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, diffexp, err := a.Data.DiffExp(user.Id, projectId.Get(ctx),
-		diffExpId.Get(ctx))
+	proj, sample, err := a.Data.Sample(user.Id, projectId.Get(ctx),
+		sampleId.Get(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
-	values, err := a.Data.DiffExpValues(diffexp.Id)
+	values, err := a.Data.SampleValues(sample.Id)
 	if err != nil {
 		return "", nil, err
 	}
@@ -158,17 +112,17 @@ func (a *Endpoints) DiffExp(ctx context.Context, req *http.Request,
 		return "", nil, err
 	}
 
-	return "diffexp", map[string]interface{}{
+	return "sample", map[string]interface{}{
 		"Project": proj,
-		"DiffExp": diffexp,
+		"Sample":  sample,
 		"Values":  values,
 		"Lookup":  dimlookup}, nil
 }
 
-func (a *Endpoints) DiffExpSimilar(ctx context.Context, req *http.Request,
+func (a *Endpoints) SampleSimilar(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, diffexp, err := a.Data.DiffExp(user.Id, projectId.Get(ctx),
-		diffExpId.Get(ctx))
+	proj, sample, err := a.Data.Sample(user.Id, projectId.Get(ctx),
+		sampleId.Get(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
@@ -178,7 +132,18 @@ func (a *Endpoints) DiffExpSimilar(ctx context.Context, req *http.Request,
 		limit = DefaultLimit
 	}
 
-	up_regulated, down_regulated, err := a.Data.TopKSignature(diffexp.Id, limit)
+	var topk_type TopKType
+	topk_type_str := req.FormValue("topk-type")
+	switch topk_type_str {
+	case "valdiff":
+		topk_type = TopKValueDiff
+	default:
+		topk_type = TopKRankDiff
+		topk_type_str = "rankdiff"
+	}
+
+	up_regulated, down_regulated, err := a.Data.TopKSignature(sample.Id, limit,
+		topk_type)
 	if err != nil {
 		return "", nil, err
 	}
@@ -191,7 +156,7 @@ func (a *Endpoints) DiffExpSimilar(ctx context.Context, req *http.Request,
 	default:
 		search_type = "topk"
 		results, err = a.Data.TopKSearch(proj.Id, up_regulated, down_regulated,
-			limit)
+			limit, topk_type)
 	}
 	if err != nil {
 		return "", nil, err
@@ -199,11 +164,14 @@ func (a *Endpoints) DiffExpSimilar(ctx context.Context, req *http.Request,
 
 	return "similar", map[string]interface{}{
 		"Project": proj,
-		"DiffExp": diffexp,
+		"Sample":  sample,
 		"Results": results,
 		"Params": url.Values{
 			"k":           []string{fmt.Sprint(limit)},
-			"search-type": []string{search_type}}.Encode()}, nil
+			"search-type": []string{search_type},
+			"topk-type":   []string{topk_type_str},
+		}.Encode(),
+	}, nil
 }
 
 func (a *Endpoints) Control(ctx context.Context, req *http.Request,
@@ -288,7 +256,7 @@ func (a *Endpoints) NewSampleFromName(ctx context.Context,
 func (a *Endpoints) newSample(ctx context.Context, w webhelp.ResponseWriter,
 	req *http.Request, user *UserInfo, proj_id, control_id int64) error {
 
-	diffexp_id, err := a.Data.NewSample(user.Id, proj_id, control_id,
+	sample_id, err := a.Data.NewSample(user.Id, proj_id, control_id,
 		req.FormValue("name"),
 		func(deliver func(dim_id int64, value float64) error) error {
 			dimlookup, err := a.Data.DimLookup(proj_id)
@@ -321,8 +289,8 @@ func (a *Endpoints) newSample(ctx context.Context, w webhelp.ResponseWriter,
 	if err != nil {
 		return err
 	}
-	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/diffexp/%d",
-		proj_id, diffexp_id))
+	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/sample/%d",
+		proj_id, sample_id))
 }
 
 func (a *Endpoints) Search(ctx context.Context, req *http.Request,
@@ -370,6 +338,14 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 		down_regulated = append(down_regulated, id)
 	}
 
+	var topk_type TopKType
+	switch req.FormValue("topk-type") {
+	case "valdiff":
+		topk_type = TopKValueDiff
+	default:
+		topk_type = TopKRankDiff
+	}
+
 	var results SearchResults
 	switch req.FormValue("search-type") {
 	case "kolmogorov":
@@ -380,7 +356,7 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 			return "", nil, webhelp.ErrBadRequest.New("invalid k parameter")
 		}
 		results, err = a.Data.TopKSearch(proj.Id, up_regulated, down_regulated,
-			limit)
+			limit, topk_type)
 	default:
 		return "", nil, webhelp.ErrBadRequest.New("invalid search-type parameter")
 	}

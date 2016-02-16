@@ -15,7 +15,7 @@ func init() {
 {{ $page := .Page }}
 {{ range .Page.Results }}
 <tr><td>
-  <a href="/project/{{$page.Project.Id}}/diffexp/{{.Id}}">{{.Name}}</a>
+  <a href="/project/{{$page.Project.Id}}/sample/{{.Id}}">{{.Name}}</a>
 </td><td>{{.Score}}</td></tr>
 {{ end }}
 </table>

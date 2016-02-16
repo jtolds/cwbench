@@ -47,6 +47,21 @@ func init() {
 </div>
 <div class="row">
 <div class="col-md-12 form-inline" style="text-align:right;">
+  <div style="display:inline-block; text-align:left; padding-right:20px;">
+  <div class="radio">
+    <label>
+      <input type="radio" name="topk-type" value="rankdiff" checked>
+      Score based on rank difference
+    </label>
+  </div><br/>
+  <div class="radio">
+    <label>
+      <input type="radio" name="topk-type" value="valdiff">
+      Score based on value difference
+    </label>
+  </div>
+  </div>
+
   <div class="form-group">
     <label for="topkInput"><strong>k = </strong></label>
     <input type="number" name="k" class="form-control" id="topkInput"
@@ -122,12 +137,12 @@ Not yet implemented
 </div>
 <div class="col-md-6">
 
-<h2>Differential expressions</h2>
+<h2>Samples</h2>
 
 <ul>
 {{ $page := .Page }}
-{{ range .Page.DiffExps }}
-<li><a href="/project/{{$page.Project.Id}}/diffexp/{{.Id}}">{{.Name}}</a></li>
+{{ range .Page.Samples }}
+<li><a href="/project/{{$page.Project.Id}}/sample/{{.Id}}">{{.Name}}</a></li>
 {{ end }}
 </ul>
 
