@@ -511,12 +511,22 @@ func (d *Data) TopKSignature(sample_id int64, k int,
 		return nil, nil, Err.Wrap(err)
 	}
 
-	for _, val := range values {
-		if val.RankDiff < 0 {
-			down = append(down, val.DimensionId)
+	switch top_k_type {
+	case TopKRankDiff:
+		for _, val := range values {
+			if val.RankDiff < 0 {
+				down = append(down, val.DimensionId)
+			} else if val.RankDiff > 0 {
+				up = append(up, val.DimensionId)
+			}
 		}
-		if val.RankDiff > 0 {
-			up = append(up, val.DimensionId)
+	case TopKValueDiff:
+		for _, val := range values {
+			if val.ValueDiff < 0 {
+				down = append(down, val.DimensionId)
+			} else if val.ValueDiff > 0 {
+				up = append(up, val.DimensionId)
+			}
 		}
 	}
 
