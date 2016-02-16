@@ -20,9 +20,9 @@ import (
 )
 
 var (
-	dbType = flag.String("db", "sqlite3", "the database type to use. "+
+	dbType = flag.String("db", "postgres", "the database type to use. "+
 		"can be postgres or sqlite3")
-	dbConn = flag.String("db.conn", "./db.db",
+	dbConn = flag.String("db.conn", "",
 		"the database connection string")
 	searchParallelism = flag.Int("parallelism", runtime.NumCPU()+1,
 		"number of parellel search queries to execute")
