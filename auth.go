@@ -87,40 +87,29 @@ func (a *Endpoints) LoadUser(ctx context.Context, inr *http.Request) (
 	return &data, nil
 }
 
-type loginRequired struct {
-	a *Endpoints
-	h webhelp.Handler
-}
-
-func (a *Endpoints) LoginRequired(h webhelp.Handler) webhelp.Handler {
-	return loginRequired{a: a, h: h}
-}
-
 type ctxKey int
 
 var (
 	userKey ctxKey = 1
 )
 
-func (lr loginRequired) HandleHTTP(ctx context.Context,
-	w webhelp.ResponseWriter, r *http.Request) error {
-	user, err := lr.a.LoadUser(ctx, r)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return webhelp.Redirect(w, r, oauth2.LoginURL(r.RequestURI, false))
-	}
-	return lr.h.HandleHTTP(context.WithValue(ctx, userKey, user), w, r)
+func (a *Endpoints) LoginRequired(h http.Handler) http.Handler {
+	return webhelp.RouteHandlerFunc(h,
+		func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			user, err := a.LoadUser(ctx, r)
+			if err != nil {
+				webhelp.HandleError(w, r, err)
+				return
+			}
+			if user == nil {
+				webhelp.Redirect(w, r, oauth2.LoginURL(r.RequestURI, false))
+				return
+			}
+			ctx = context.WithValue(ctx, userKey, user)
+			h.ServeHTTP(w, r.WithContext(ctx))
+		})
 }
-
-func (lr loginRequired) Routes(
-	cb func(method, path string, annotations []string)) {
-	webhelp.Routes(lr.h, cb)
-}
-
-var _ webhelp.Handler = loginRequired{}
-var _ webhelp.RouteLister = loginRequired{}
 
 func LoadUser(ctx context.Context) *UserInfo {
 	return ctx.Value(userKey).(*UserInfo)

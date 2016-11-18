@@ -46,7 +46,7 @@ func main() {
 
 	endpoints := NewEndpoints(data)
 
-	routes := webhelp.LoggingHandler(
+	routes := webhelp.LoggingHandler(webhelp.FatalHandler(
 		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
 			webhelp.OverlayMux{
 				Fallback: endpoints.LoginRequired(webhelp.DirMux{
@@ -108,7 +108,7 @@ func main() {
 				}),
 				Overlay: webhelp.DirMux{
 					"auth": oauth2,
-				}}))
+				}})))
 
 	switch flag.Arg(0) {
 	case "createdb":

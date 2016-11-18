@@ -37,15 +37,14 @@ func (a *Endpoints) APIKeys(ctx context.Context, req *http.Request,
 	}, nil
 }
 
-func (a *Endpoints) NewAPIKey(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo) error {
-
+func (a *Endpoints) NewAPIKey(w http.ResponseWriter, req *http.Request,
+	user *UserInfo) {
 	_, err := a.Data.NewAPIKey(user.Id)
 	if err != nil {
-		return err
+		webhelp.FatalError(w, req, err)
 	}
 
-	return webhelp.Redirect(w, req, fmt.Sprintf("/account/apikeys"))
+	webhelp.Redirect(w, req, fmt.Sprintf("/account/apikeys"))
 }
 
 func (a *Endpoints) ProjectList(ctx context.Context, req *http.Request,
@@ -61,7 +60,7 @@ func (a *Endpoints) ProjectList(ctx context.Context, req *http.Request,
 
 func (a *Endpoints) Project(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, read_only, err := a.Data.Project(user.Id, projectId.Get(ctx))
+	proj, read_only, err := a.Data.Project(user.Id, projectId.MustGet(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
@@ -78,8 +77,8 @@ func (a *Endpoints) Project(ctx context.Context, req *http.Request,
 	}, nil
 }
 
-func (a *Endpoints) NewProject(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo) error {
+func (a *Endpoints) NewProject(w http.ResponseWriter, req *http.Request,
+	user *UserInfo) {
 	proj_id, err := a.Data.NewProject(user.Id, req.FormValue("name"),
 		func(deliver func(dim string) error) error {
 			for _, dim := range strings.Fields(req.FormValue("dimensions")) {
@@ -91,15 +90,15 @@ func (a *Endpoints) NewProject(ctx context.Context, w webhelp.ResponseWriter,
 			return nil
 		})
 	if err != nil {
-		return err
+		webhelp.FatalError(w, req, err)
 	}
-	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d", proj_id))
+	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d", proj_id))
 }
 
 func (a *Endpoints) Sample(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, sample, err := a.Data.Sample(user.Id, projectId.Get(ctx),
-		sampleId.Get(ctx))
+	proj, sample, err := a.Data.Sample(user.Id, projectId.MustGet(ctx),
+		sampleId.MustGet(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
@@ -121,8 +120,8 @@ func (a *Endpoints) Sample(ctx context.Context, req *http.Request,
 
 func (a *Endpoints) SampleSimilar(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, sample, err := a.Data.Sample(user.Id, projectId.Get(ctx),
-		sampleId.Get(ctx))
+	proj, sample, err := a.Data.Sample(user.Id, projectId.MustGet(ctx),
+		sampleId.MustGet(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
@@ -176,8 +175,8 @@ func (a *Endpoints) SampleSimilar(ctx context.Context, req *http.Request,
 
 func (a *Endpoints) Control(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, control, read_only, err := a.Data.Control(user.Id, projectId.Get(ctx),
-		controlId.Get(ctx))
+	proj, control, read_only, err := a.Data.Control(user.Id,
+		projectId.MustGet(ctx), controlId.MustGet(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}
@@ -198,9 +197,9 @@ func (a *Endpoints) Control(ctx context.Context, req *http.Request,
 		"Lookup":   dimlookup}, nil
 }
 
-func (a *Endpoints) NewControl(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo) error {
-	proj_id := projectId.Get(ctx)
+func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
+	user *UserInfo) {
+	proj_id := projectId.MustGet(req.Context())
 	control_id, err := a.Data.NewControl(user.Id, proj_id, req.FormValue("name"),
 		func(deliver func(dim_id int64, value float64) error) error {
 			dimlookup, err := a.Data.DimLookup(proj_id)
@@ -232,30 +231,32 @@ func (a *Endpoints) NewControl(ctx context.Context, w webhelp.ResponseWriter,
 			return nil
 		})
 	if err != nil {
-		return err
+		webhelp.FatalError(w, req, err)
 	}
-	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/control/%d",
+	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/control/%d",
 		proj_id, control_id))
 }
 
-func (a *Endpoints) NewSample(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo) error {
-	return a.newSample(ctx, w, req, user, projectId.Get(ctx), controlId.Get(ctx))
+func (a *Endpoints) NewSample(w http.ResponseWriter, req *http.Request,
+	user *UserInfo) {
+	ctx := req.Context()
+	a.newSample(ctx, w, req, user, projectId.MustGet(ctx),
+		controlId.MustGet(ctx))
 }
 
-func (a *Endpoints) NewSampleFromName(ctx context.Context,
-	w webhelp.ResponseWriter, req *http.Request, user *UserInfo) error {
-	proj_id := projectId.Get(ctx)
+func (a *Endpoints) NewSampleFromName(w http.ResponseWriter, req *http.Request,
+	user *UserInfo) {
+	ctx := req.Context()
+	proj_id := projectId.MustGet(ctx)
 	control, err := a.Data.ControlByName(proj_id, controlName.Get(ctx))
 	if err != nil {
-		return err
+		webhelp.FatalError(w, req, err)
 	}
-	return a.newSample(ctx, w, req, user, proj_id, control.Id)
+	a.newSample(ctx, w, req, user, proj_id, control.Id)
 }
 
-func (a *Endpoints) newSample(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo, proj_id, control_id int64) error {
-
+func (a *Endpoints) newSample(ctx context.Context, w http.ResponseWriter,
+	req *http.Request, user *UserInfo, proj_id, control_id int64) {
 	sample_id, err := a.Data.NewSample(user.Id, proj_id, control_id,
 		req.FormValue("name"),
 		func(deliver func(dim_id int64, value float64) error) error {
@@ -287,15 +288,16 @@ func (a *Endpoints) newSample(ctx context.Context, w webhelp.ResponseWriter,
 			return nil
 		})
 	if err != nil {
-		return err
+		webhelp.FatalError(w, req, err)
+		return
 	}
-	return webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/sample/%d",
+	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/sample/%d",
 		proj_id, sample_id))
 }
 
 func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
-	proj, _, err := a.Data.Project(user.Id, projectId.Get(ctx))
+	proj, _, err := a.Data.Project(user.Id, projectId.MustGet(ctx))
 	if err != nil {
 		return "", nil, webhelp.ErrNotFound.Wrap(err)
 	}

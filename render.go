@@ -31,45 +31,49 @@ func NewRenderer() (*Renderer, error) {
 	return &Renderer{Templates: tmpl.Templates}, nil
 }
 
-func (r Renderer) Render(logic Logic) webhelp.Handler {
-	return webhelp.HandlerFunc(
-		func(ctx context.Context, w webhelp.ResponseWriter,
-			req *http.Request) error {
+func (r Renderer) Render(logic Logic) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, req *http.Request) {
+			ctx := req.Context()
 			user := LoadUser(ctx)
 			tmpl, page, err := logic(ctx, req, user)
 			if err != nil {
-				return err
+				webhelp.FatalError(w, req, err)
 			}
 			t := r.Templates.Lookup(tmpl)
 			if t == nil {
-				return webhelp.ErrInternalServerError.New("no template %#v registered", tmpl)
+				webhelp.FatalError(w, req, webhelp.ErrInternalServerError.New(
+					"no template %#v registered", tmpl))
 			}
 			w.Header().Set("Content-Type", "text/html")
-			return t.Execute(w, PageCtx{
+			err = t.Execute(w, PageCtx{
 				User:      user,
 				LogoutURL: oauth2.LogoutURL("/"),
 				Page:      page})
+			if err != nil {
+				webhelp.FatalError(w, req, err)
+			}
 		})
 }
 
-type Handler func(ctx context.Context, w webhelp.ResponseWriter,
-	req *http.Request, user *UserInfo) error
+type Handler func(w http.ResponseWriter, req *http.Request, user *UserInfo)
 
-func (r Renderer) Process(logic Handler) webhelp.Handler {
-	return webhelp.ExactPath(webhelp.HandlerFunc(func(ctx context.Context,
-		w webhelp.ResponseWriter, req *http.Request) error {
-		return logic(ctx, w, req, LoadUser(ctx))
-	}))
+func (r Renderer) Process(logic Handler) http.Handler {
+	return webhelp.ExactPath(http.HandlerFunc(
+		func(w http.ResponseWriter, req *http.Request) {
+			logic(w, req, LoadUser(req.Context()))
+		}))
 }
 
 var (
 	ProjectRedirector = webhelp.RedirectHandlerFunc(
-		func(ctx context.Context, r *http.Request) string {
-			return fmt.Sprintf("/project/%d", projectId.Get(ctx))
+		func(r *http.Request) string {
+			return fmt.Sprintf("/project/%d", projectId.MustGet(r.Context()))
 		})
 	ControlRedirector = webhelp.RedirectHandlerFunc(
-		func(ctx context.Context, r *http.Request) string {
+		func(r *http.Request) string {
+			ctx := r.Context()
 			return fmt.Sprintf("/project/%d/control/%d",
-				projectId.Get(ctx), controlId.Get(ctx))
+				projectId.MustGet(ctx), controlId.MustGet(ctx))
 		})
 )
