@@ -35,7 +35,7 @@ var (
 )
 
 type Data struct {
-	db gorm.DB
+	db *gorm.DB
 }
 
 func NewData() (*Data, error) {
@@ -46,7 +46,7 @@ func NewData() (*Data, error) {
 	return &Data{db: db}, nil
 }
 
-func (d *Data) DB() gorm.DB {
+func (d *Data) DB() *gorm.DB {
 	return d.db
 }
 
@@ -150,7 +150,7 @@ func (d *Data) NewProject(user_id, name string,
 }
 
 type DimLookup struct {
-	db     gorm.DB
+	db     *gorm.DB
 	projId int64
 
 	dims     []Dimension
