@@ -41,7 +41,7 @@ func (a *Endpoints) NewAPIKey(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
 	_, err := a.Data.NewAPIKey(user.Id)
 	if err != nil {
-		webhelp.FatalError(w, req, err)
+		webhelp.FatalError(err)
 	}
 
 	webhelp.Redirect(w, req, fmt.Sprintf("/account/apikeys"))
@@ -90,7 +90,7 @@ func (a *Endpoints) NewProject(w http.ResponseWriter, req *http.Request,
 			return nil
 		})
 	if err != nil {
-		webhelp.FatalError(w, req, err)
+		webhelp.FatalError(err)
 	}
 	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d", proj_id))
 }
@@ -231,7 +231,7 @@ func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
 			return nil
 		})
 	if err != nil {
-		webhelp.FatalError(w, req, err)
+		webhelp.FatalError(err)
 	}
 	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/control/%d",
 		proj_id, control_id))
@@ -250,7 +250,7 @@ func (a *Endpoints) NewSampleFromName(w http.ResponseWriter, req *http.Request,
 	proj_id := projectId.MustGet(ctx)
 	control, err := a.Data.ControlByName(proj_id, controlName.Get(ctx))
 	if err != nil {
-		webhelp.FatalError(w, req, err)
+		webhelp.FatalError(err)
 	}
 	a.newSample(ctx, w, req, user, proj_id, control.Id)
 }
@@ -288,8 +288,7 @@ func (a *Endpoints) newSample(ctx context.Context, w http.ResponseWriter,
 			return nil
 		})
 	if err != nil {
-		webhelp.FatalError(w, req, err)
-		return
+		webhelp.FatalError(err)
 	}
 	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/sample/%d",
 		proj_id, sample_id))

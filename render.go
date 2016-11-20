@@ -38,11 +38,11 @@ func (r Renderer) Render(logic Logic) http.Handler {
 			user := LoadUser(ctx)
 			tmpl, page, err := logic(ctx, req, user)
 			if err != nil {
-				webhelp.FatalError(w, req, err)
+				webhelp.FatalError(err)
 			}
 			t := r.Templates.Lookup(tmpl)
 			if t == nil {
-				webhelp.FatalError(w, req, webhelp.ErrInternalServerError.New(
+				webhelp.FatalError(webhelp.ErrInternalServerError.New(
 					"no template %#v registered", tmpl))
 			}
 			w.Header().Set("Content-Type", "text/html")
@@ -51,7 +51,7 @@ func (r Renderer) Render(logic Logic) http.Handler {
 				LogoutURL: oauth2.LogoutURL("/"),
 				Page:      page})
 			if err != nil {
-				webhelp.FatalError(w, req, err)
+				webhelp.FatalError(err)
 			}
 		})
 }
