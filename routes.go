@@ -49,54 +49,53 @@ func main() {
 	routes := webhelp.LoggingHandler(webhelp.FatalHandler(
 		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
 			webhelp.OverlayMux{
-				Fallback: endpoints.LoginRequired(webhelp.DirMux{
+				Default: endpoints.LoginRequired(webhelp.DirMux{
 					"": webhelp.Exact(renderer.Render(endpoints.ProjectList)),
 
-					"project": projectId.OptShift(
-
-						webhelp.ExactPath(webhelp.MethodMux{
-							"GET":  webhelp.RedirectHandler("/"),
-							"POST": renderer.Process(endpoints.NewProject),
-						}),
-
+					"project": projectId.ShiftOpt(
 						webhelp.DirMux{
 							"": webhelp.Exact(renderer.Render(endpoints.Project)),
 
-							"sample": sampleId.OptShift(
-								webhelp.ExactPath(webhelp.MethodMux{
-									"GET": ProjectRedirector,
-								}),
+							"sample": sampleId.ShiftOpt(
 								webhelp.DirMux{
 									"": webhelp.ExactGet(renderer.Render(endpoints.Sample)),
 									"similar": webhelp.ExactGet(
 										renderer.Render(endpoints.SampleSimilar)),
 								},
+								webhelp.ExactPath(webhelp.MethodMux{
+									"GET": ProjectRedirector,
+								}),
 							),
 
-							"control": controlId.OptShift(
-								webhelp.ExactPath(webhelp.MethodMux{
-									"GET":  ProjectRedirector,
-									"POST": renderer.Process(endpoints.NewControl),
-								}),
-
+							"control": controlId.ShiftOpt(
 								webhelp.DirMux{
 									"": webhelp.Exact(renderer.Render(endpoints.Control)),
 									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
 										renderer.Process(endpoints.NewSample))),
 								},
+								webhelp.ExactPath(webhelp.MethodMux{
+									"GET":  ProjectRedirector,
+									"POST": renderer.Process(endpoints.NewControl),
+								}),
 							),
 
-							"control_named": controlName.OptShift(
-								webhelp.ExactGet(ProjectRedirector),
+							"control_named": controlName.ShiftOpt(
 								webhelp.DirMux{
 									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
 										renderer.Process(endpoints.NewSampleFromName))),
-								}),
+								},
+								webhelp.ExactGet(ProjectRedirector),
+							),
 
 							"search": webhelp.ExactMethod("POST",
 								webhelp.ExactPath(renderer.Render(endpoints.Search)),
 							),
 						},
+
+						webhelp.ExactPath(webhelp.MethodMux{
+							"GET":  webhelp.RedirectHandler("/"),
+							"POST": renderer.Process(endpoints.NewProject),
+						}),
 					),
 
 					"account": webhelp.DirMux{
