@@ -199,7 +199,7 @@ func (a *Endpoints) Control(ctx context.Context, req *http.Request,
 
 func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
-	proj_id := projectId.MustGet(req.Context())
+	proj_id := projectId.MustGet(webhelp.Context(req))
 	control_id, err := a.Data.NewControl(user.Id, proj_id, req.FormValue("name"),
 		func(deliver func(dim_id int64, value float64) error) error {
 			dimlookup, err := a.Data.DimLookup(proj_id)
@@ -239,14 +239,14 @@ func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
 
 func (a *Endpoints) NewSample(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
-	ctx := req.Context()
+	ctx := webhelp.Context(req)
 	a.newSample(ctx, w, req, user, projectId.MustGet(ctx),
 		controlId.MustGet(ctx))
 }
 
 func (a *Endpoints) NewSampleFromName(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
-	ctx := req.Context()
+	ctx := webhelp.Context(req)
 	proj_id := projectId.MustGet(ctx)
 	control, err := a.Data.ControlByName(proj_id, controlName.Get(ctx))
 	if err != nil {

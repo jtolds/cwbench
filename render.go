@@ -34,7 +34,7 @@ func NewRenderer() (*Renderer, error) {
 func (r Renderer) Render(logic Logic) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			ctx := req.Context()
+			ctx := webhelp.Context(req)
 			user := LoadUser(ctx)
 			tmpl, page, err := logic(ctx, req, user)
 			if err != nil {
@@ -61,18 +61,18 @@ type Handler func(w http.ResponseWriter, req *http.Request, user *UserInfo)
 func (r Renderer) Process(logic Handler) http.Handler {
 	return webhelp.ExactPath(http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			logic(w, req, LoadUser(req.Context()))
+			logic(w, req, LoadUser(webhelp.Context(req)))
 		}))
 }
 
 var (
 	ProjectRedirector = webhelp.RedirectHandlerFunc(
 		func(r *http.Request) string {
-			return fmt.Sprintf("/project/%d", projectId.MustGet(r.Context()))
+			return fmt.Sprintf("/project/%d", projectId.MustGet(webhelp.Context(r)))
 		})
 	ControlRedirector = webhelp.RedirectHandlerFunc(
 		func(r *http.Request) string {
-			ctx := r.Context()
+			ctx := webhelp.Context(r)
 			return fmt.Sprintf("/project/%d/control/%d",
 				projectId.MustGet(ctx), controlId.MustGet(ctx))
 		})

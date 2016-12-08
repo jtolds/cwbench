@@ -96,7 +96,7 @@ var (
 func (a *Endpoints) LoginRequired(h http.Handler) http.Handler {
 	return webhelp.RouteHandlerFunc(h,
 		func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
+			ctx := webhelp.Context(r)
 			user, err := a.LoadUser(ctx, r)
 			if err != nil {
 				webhelp.HandleError(w, r, err)
@@ -107,7 +107,7 @@ func (a *Endpoints) LoginRequired(h http.Handler) http.Handler {
 				return
 			}
 			ctx = context.WithValue(ctx, userKey, user)
-			h.ServeHTTP(w, r.WithContext(ctx))
+			h.ServeHTTP(w, webhelp.WithContext(r, ctx))
 		})
 }
 
