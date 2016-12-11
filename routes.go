@@ -58,8 +58,8 @@ func main() {
 
 							"sample": sampleId.ShiftOpt(
 								webhelp.DirMux{
-									"": webhelp.ExactGet(renderer.Render(endpoints.Sample)),
-									"similar": webhelp.ExactGet(
+									"": webhelp.RequireGet(renderer.Render(endpoints.Sample)),
+									"similar": webhelp.RequireGet(
 										renderer.Render(endpoints.SampleSimilar)),
 								},
 								webhelp.ExactPath(webhelp.MethodMux{
@@ -70,7 +70,7 @@ func main() {
 							"control": controlId.ShiftOpt(
 								webhelp.DirMux{
 									"": webhelp.Exact(renderer.Render(endpoints.Control)),
-									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
+									"sample": webhelp.ExactPath(webhelp.RequireMethod("POST",
 										renderer.Process(endpoints.NewSample))),
 								},
 								webhelp.ExactPath(webhelp.MethodMux{
@@ -81,13 +81,13 @@ func main() {
 
 							"control_named": controlName.ShiftOpt(
 								webhelp.DirMux{
-									"sample": webhelp.ExactPath(webhelp.ExactMethod("POST",
+									"sample": webhelp.ExactPath(webhelp.RequireMethod("POST",
 										renderer.Process(endpoints.NewSampleFromName))),
 								},
-								webhelp.ExactGet(ProjectRedirector),
+								webhelp.RequireGet(ProjectRedirector),
 							),
 
-							"search": webhelp.ExactMethod("POST",
+							"search": webhelp.RequireMethod("POST",
 								webhelp.ExactPath(renderer.Render(endpoints.Search)),
 							),
 						},
