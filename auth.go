@@ -8,9 +8,12 @@ import (
 	"flag"
 	"net/http"
 
-	"github.com/jtolds/webhelp"
-	oauth2p "github.com/jtolds/webhelp-oauth2"
 	"golang.org/x/net/context"
+	"gopkg.in/go-webhelp/whoauth2.v1"
+	"gopkg.in/webhelp.v1/whcompat"
+	"gopkg.in/webhelp.v1/wherr"
+	"gopkg.in/webhelp.v1/whredir"
+	"gopkg.in/webhelp.v1/whroute"
 )
 
 var (
@@ -18,18 +21,18 @@ var (
 	googleClientSecret = flag.String("google_client_secret", "", "")
 	visibleURL         = flag.String("visible_url", "http://localhost:8080", "")
 
-	oauth2 *oauth2p.ProviderHandler
+	oauth2 *whoauth2.ProviderHandler
 )
 
 func loadOAuth2() {
-	oauth2 = oauth2p.NewProviderHandler(
-		oauth2p.Google(oauth2p.Config{
+	oauth2 = whoauth2.NewProviderHandler(
+		whoauth2.Google(whoauth2.Config{
 			ClientID:     *googleClientId,
 			ClientSecret: *googleClientSecret,
 			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
 			RedirectURL:  *visibleURL + "/auth/_cb"}),
 		"oauth-google", "/auth",
-		oauth2p.RedirectURLs{})
+		whoauth2.RedirectURLs{})
 }
 
 type UserInfo struct {
@@ -51,7 +54,7 @@ func (a *Endpoints) LoadUser(ctx context.Context, inr *http.Request) (
 			return nil, err
 		}
 		if key == nil {
-			return nil, webhelp.ErrUnauthorized.New("invalid api key")
+			return nil, wherr.Unauthorized.New("invalid api key")
 		}
 		return &UserInfo{Id: key.UserId}, nil
 	}
@@ -77,7 +80,7 @@ func (a *Endpoints) LoadUser(ctx context.Context, inr *http.Request) (
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, webhelp.HTTPError.New("invalid status: %v", resp.Status)
+		return nil, wherr.HTTPError.New("invalid status: %v", resp.Status)
 	}
 	var data UserInfo
 	err = json.NewDecoder(resp.Body).Decode(&data)
@@ -94,20 +97,20 @@ var (
 )
 
 func (a *Endpoints) LoginRequired(h http.Handler) http.Handler {
-	return webhelp.RouteHandlerFunc(h,
+	return whroute.HandlerFunc(h,
 		func(w http.ResponseWriter, r *http.Request) {
-			ctx := webhelp.Context(r)
+			ctx := whcompat.Context(r)
 			user, err := a.LoadUser(ctx, r)
 			if err != nil {
-				webhelp.HandleError(w, r, err)
+				wherr.Handle(w, r, err)
 				return
 			}
 			if user == nil {
-				webhelp.Redirect(w, r, oauth2.LoginURL(r.RequestURI, false))
+				whredir.Redirect(w, r, oauth2.LoginURL(r.RequestURI, false))
 				return
 			}
 			ctx = context.WithValue(ctx, userKey, user)
-			h.ServeHTTP(w, webhelp.WithContext(r, ctx))
+			h.ServeHTTP(w, whcompat.WithContext(r, ctx))
 		})
 }
 

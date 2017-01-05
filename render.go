@@ -9,8 +9,12 @@ import (
 	"net/http"
 
 	"github.com/jtolds/cwbench/internal/tmpl"
-	"github.com/jtolds/webhelp"
 	"golang.org/x/net/context"
+	"gopkg.in/webhelp.v1/whcompat"
+	"gopkg.in/webhelp.v1/wherr"
+	"gopkg.in/webhelp.v1/whfatal"
+	"gopkg.in/webhelp.v1/whmux"
+	"gopkg.in/webhelp.v1/whredir"
 )
 
 type PageCtx struct {
@@ -34,15 +38,15 @@ func NewRenderer() (*Renderer, error) {
 func (r Renderer) Render(logic Logic) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			ctx := webhelp.Context(req)
+			ctx := whcompat.Context(req)
 			user := LoadUser(ctx)
 			tmpl, page, err := logic(ctx, req, user)
 			if err != nil {
-				webhelp.FatalError(err)
+				whfatal.Error(err)
 			}
 			t := r.Templates.Lookup(tmpl)
 			if t == nil {
-				webhelp.FatalError(webhelp.ErrInternalServerError.New(
+				whfatal.Error(wherr.InternalServerError.New(
 					"no template %#v registered", tmpl))
 			}
 			w.Header().Set("Content-Type", "text/html")
@@ -51,7 +55,7 @@ func (r Renderer) Render(logic Logic) http.Handler {
 				LogoutURL: oauth2.LogoutURL("/"),
 				Page:      page})
 			if err != nil {
-				webhelp.FatalError(err)
+				whfatal.Error(err)
 			}
 		})
 }
@@ -59,20 +63,20 @@ func (r Renderer) Render(logic Logic) http.Handler {
 type Handler func(w http.ResponseWriter, req *http.Request, user *UserInfo)
 
 func (r Renderer) Process(logic Handler) http.Handler {
-	return webhelp.ExactPath(http.HandlerFunc(
+	return whmux.ExactPath(http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
-			logic(w, req, LoadUser(webhelp.Context(req)))
+			logic(w, req, LoadUser(whcompat.Context(req)))
 		}))
 }
 
 var (
-	ProjectRedirector = webhelp.RedirectHandlerFunc(
+	ProjectRedirector = whredir.RedirectHandlerFunc(
 		func(r *http.Request) string {
-			return fmt.Sprintf("/project/%d", projectId.MustGet(webhelp.Context(r)))
+			return fmt.Sprintf("/project/%d", projectId.MustGet(whcompat.Context(r)))
 		})
-	ControlRedirector = webhelp.RedirectHandlerFunc(
+	ControlRedirector = whredir.RedirectHandlerFunc(
 		func(r *http.Request) string {
-			ctx := webhelp.Context(r)
+			ctx := whcompat.Context(r)
 			return fmt.Sprintf("/project/%d/control/%d",
 				projectId.MustGet(ctx), controlId.MustGet(ctx))
 		})

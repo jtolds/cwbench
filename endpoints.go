@@ -10,8 +10,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jtolds/webhelp"
 	"golang.org/x/net/context"
+	"gopkg.in/webhelp.v1/whcompat"
+	"gopkg.in/webhelp.v1/wherr"
+	"gopkg.in/webhelp.v1/whfatal"
+	"gopkg.in/webhelp.v1/whredir"
 )
 
 const (
@@ -41,10 +44,10 @@ func (a *Endpoints) NewAPIKey(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
 	_, err := a.Data.NewAPIKey(user.Id)
 	if err != nil {
-		webhelp.FatalError(err)
+		whfatal.Error(err)
 	}
 
-	webhelp.Redirect(w, req, fmt.Sprintf("/account/apikeys"))
+	whredir.Redirect(w, req, fmt.Sprintf("/account/apikeys"))
 }
 
 func (a *Endpoints) ProjectList(ctx context.Context, req *http.Request,
@@ -62,7 +65,7 @@ func (a *Endpoints) Project(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
 	proj, read_only, err := a.Data.Project(user.Id, projectId.MustGet(ctx))
 	if err != nil {
-		return "", nil, webhelp.ErrNotFound.Wrap(err)
+		return "", nil, wherr.NotFound.Wrap(err)
 	}
 	dimCount, samples, controls, err := a.Data.ProjectInfo(proj.Id)
 	if err != nil {
@@ -90,9 +93,9 @@ func (a *Endpoints) NewProject(w http.ResponseWriter, req *http.Request,
 			return nil
 		})
 	if err != nil {
-		webhelp.FatalError(err)
+		whfatal.Error(err)
 	}
-	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d", proj_id))
+	whredir.Redirect(w, req, fmt.Sprintf("/project/%d", proj_id))
 }
 
 func (a *Endpoints) Sample(ctx context.Context, req *http.Request,
@@ -100,7 +103,7 @@ func (a *Endpoints) Sample(ctx context.Context, req *http.Request,
 	proj, sample, err := a.Data.Sample(user.Id, projectId.MustGet(ctx),
 		sampleId.MustGet(ctx))
 	if err != nil {
-		return "", nil, webhelp.ErrNotFound.Wrap(err)
+		return "", nil, wherr.NotFound.Wrap(err)
 	}
 	values, err := a.Data.SampleValues(sample.Id)
 	if err != nil {
@@ -123,7 +126,7 @@ func (a *Endpoints) SampleSimilar(ctx context.Context, req *http.Request,
 	proj, sample, err := a.Data.Sample(user.Id, projectId.MustGet(ctx),
 		sampleId.MustGet(ctx))
 	if err != nil {
-		return "", nil, webhelp.ErrNotFound.Wrap(err)
+		return "", nil, wherr.NotFound.Wrap(err)
 	}
 
 	limit, err := strconv.Atoi(req.FormValue("k"))
@@ -178,7 +181,7 @@ func (a *Endpoints) Control(ctx context.Context, req *http.Request,
 	proj, control, read_only, err := a.Data.Control(user.Id,
 		projectId.MustGet(ctx), controlId.MustGet(ctx))
 	if err != nil {
-		return "", nil, webhelp.ErrNotFound.Wrap(err)
+		return "", nil, wherr.NotFound.Wrap(err)
 	}
 	values, err := a.Data.ControlValues(control.Id)
 	if err != nil {
@@ -199,7 +202,7 @@ func (a *Endpoints) Control(ctx context.Context, req *http.Request,
 
 func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
-	proj_id := projectId.MustGet(webhelp.Context(req))
+	proj_id := projectId.MustGet(whcompat.Context(req))
 	control_id, err := a.Data.NewControl(user.Id, proj_id, req.FormValue("name"),
 		func(deliver func(dim_id int64, value float64) error) error {
 			dimlookup, err := a.Data.DimLookup(proj_id)
@@ -213,7 +216,7 @@ func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
 					continue
 				}
 				if len(fields) != 2 {
-					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
+					return wherr.BadRequest.New("malformed data: %#v", row)
 				}
 				id, err := dimlookup.LookupId(fields[0])
 				if err != nil {
@@ -221,7 +224,7 @@ func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
 				}
 				val, err := strconv.ParseFloat(fields[1], 64)
 				if err != nil {
-					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
+					return wherr.BadRequest.New("malformed data: %#v", row)
 				}
 				err = deliver(id, val)
 				if err != nil {
@@ -231,26 +234,26 @@ func (a *Endpoints) NewControl(w http.ResponseWriter, req *http.Request,
 			return nil
 		})
 	if err != nil {
-		webhelp.FatalError(err)
+		whfatal.Error(err)
 	}
-	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/control/%d",
+	whredir.Redirect(w, req, fmt.Sprintf("/project/%d/control/%d",
 		proj_id, control_id))
 }
 
 func (a *Endpoints) NewSample(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
-	ctx := webhelp.Context(req)
+	ctx := whcompat.Context(req)
 	a.newSample(ctx, w, req, user, projectId.MustGet(ctx),
 		controlId.MustGet(ctx))
 }
 
 func (a *Endpoints) NewSampleFromName(w http.ResponseWriter, req *http.Request,
 	user *UserInfo) {
-	ctx := webhelp.Context(req)
+	ctx := whcompat.Context(req)
 	proj_id := projectId.MustGet(ctx)
 	control, err := a.Data.ControlByName(proj_id, controlName.Get(ctx))
 	if err != nil {
-		webhelp.FatalError(err)
+		whfatal.Error(err)
 	}
 	a.newSample(ctx, w, req, user, proj_id, control.Id)
 }
@@ -270,7 +273,7 @@ func (a *Endpoints) newSample(ctx context.Context, w http.ResponseWriter,
 					continue
 				}
 				if len(fields) != 2 {
-					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
+					return wherr.BadRequest.New("malformed data: %#v", row)
 				}
 				id, err := dimlookup.LookupId(fields[0])
 				if err != nil {
@@ -278,7 +281,7 @@ func (a *Endpoints) newSample(ctx context.Context, w http.ResponseWriter,
 				}
 				val, err := strconv.ParseFloat(fields[1], 64)
 				if err != nil {
-					return webhelp.ErrBadRequest.New("malformed data: %#v", row)
+					return wherr.BadRequest.New("malformed data: %#v", row)
 				}
 				err = deliver(id, val)
 				if err != nil {
@@ -288,9 +291,9 @@ func (a *Endpoints) newSample(ctx context.Context, w http.ResponseWriter,
 			return nil
 		})
 	if err != nil {
-		webhelp.FatalError(err)
+		whfatal.Error(err)
 	}
-	webhelp.Redirect(w, req, fmt.Sprintf("/project/%d/sample/%d",
+	whredir.Redirect(w, req, fmt.Sprintf("/project/%d/sample/%d",
 		proj_id, sample_id))
 }
 
@@ -298,13 +301,13 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 	user *UserInfo) (tmpl string, page map[string]interface{}, err error) {
 	proj, _, err := a.Data.Project(user.Id, projectId.MustGet(ctx))
 	if err != nil {
-		return "", nil, webhelp.ErrNotFound.Wrap(err)
+		return "", nil, wherr.NotFound.Wrap(err)
 	}
 
 	up_regulated_strings := strings.Fields(req.FormValue("up-regulated"))
 	down_regulated_strings := strings.Fields(req.FormValue("down-regulated"))
 	if len(up_regulated_strings)+len(down_regulated_strings) == 0 {
-		return "", nil, webhelp.ErrBadRequest.New("no dimensions provided")
+		return "", nil, wherr.BadRequest.New("no dimensions provided")
 	}
 
 	dimlookup, err := a.Data.DimLookup(proj.Id)
@@ -318,7 +321,7 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 	down_regulated := make([]int64, 0, len(down_regulated_strings))
 	for _, val := range up_regulated_strings {
 		if seen[val] {
-			return "", nil, webhelp.ErrBadRequest.New("duplicated dimension")
+			return "", nil, wherr.BadRequest.New("duplicated dimension")
 		}
 		seen[val] = true
 		id, err := dimlookup.LookupId(val)
@@ -329,7 +332,7 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 	}
 	for _, val := range down_regulated_strings {
 		if seen[val] {
-			return "", nil, webhelp.ErrBadRequest.New("duplicated dimension")
+			return "", nil, wherr.BadRequest.New("duplicated dimension")
 		}
 		seen[val] = true
 		id, err := dimlookup.LookupId(val)
@@ -354,12 +357,12 @@ func (a *Endpoints) Search(ctx context.Context, req *http.Request,
 	case "topk":
 		limit, err := strconv.Atoi(req.FormValue("k"))
 		if err != nil {
-			return "", nil, webhelp.ErrBadRequest.New("invalid k parameter")
+			return "", nil, wherr.BadRequest.New("invalid k parameter")
 		}
 		results, err = a.Data.TopKSearch(proj.Id, up_regulated, down_regulated,
 			limit, topk_type)
 	default:
-		return "", nil, webhelp.ErrBadRequest.New("invalid search-type parameter")
+		return "", nil, wherr.BadRequest.New("invalid search-type parameter")
 	}
 	if err != nil {
 		return "", nil, err

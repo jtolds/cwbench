@@ -9,8 +9,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jtolds/webhelp"
-	"github.com/jtolds/webhelp/sessions"
+	"gopkg.in/webhelp.v1/whfatal"
+	"gopkg.in/webhelp.v1/whlog"
+	"gopkg.in/webhelp.v1/whmux"
+	"gopkg.in/webhelp.v1/whredir"
+	"gopkg.in/webhelp.v1/whroute"
+	"gopkg.in/webhelp.v1/whsess"
 )
 
 var (
@@ -18,11 +22,10 @@ var (
 	cookieSecret = flag.String("cookie_secret", "abcdef0123456789",
 		"the secret for securing cookie information")
 
-	projectId = webhelp.NewIntArgMux()
-	controlId = webhelp.NewIntArgMux()
-	sampleId  = webhelp.NewIntArgMux()
-
-	controlName = webhelp.NewStringArgMux()
+	projectId   = whmux.NewIntArg()
+	controlId   = whmux.NewIntArg()
+	sampleId    = whmux.NewIntArg()
+	controlName = whmux.NewStringArg()
 )
 
 func main() {
@@ -46,66 +49,66 @@ func main() {
 
 	endpoints := NewEndpoints(data)
 
-	routes := webhelp.LoggingHandler(webhelp.FatalHandler(
-		sessions.HandlerWithStore(sessions.NewCookieStore(secret),
-			webhelp.OverlayMux{
-				Default: endpoints.LoginRequired(webhelp.DirMux{
-					"": webhelp.Exact(renderer.Render(endpoints.ProjectList)),
+	routes := whlog.LogRequests(whlog.Default, whfatal.Catch(
+		whsess.HandlerWithStore(whsess.NewCookieStore(secret),
+			whmux.Overlay{
+				Default: endpoints.LoginRequired(whmux.Dir{
+					"": whmux.Exact(renderer.Render(endpoints.ProjectList)),
 
 					"project": projectId.ShiftOpt(
-						webhelp.DirMux{
-							"": webhelp.Exact(renderer.Render(endpoints.Project)),
+						whmux.Dir{
+							"": whmux.Exact(renderer.Render(endpoints.Project)),
 
 							"sample": sampleId.ShiftOpt(
-								webhelp.DirMux{
-									"": webhelp.RequireGet(renderer.Render(endpoints.Sample)),
-									"similar": webhelp.RequireGet(
+								whmux.Dir{
+									"": whmux.RequireGet(renderer.Render(endpoints.Sample)),
+									"similar": whmux.RequireGet(
 										renderer.Render(endpoints.SampleSimilar)),
 								},
-								webhelp.ExactPath(webhelp.MethodMux{
+								whmux.ExactPath(whmux.Method{
 									"GET": ProjectRedirector,
 								}),
 							),
 
 							"control": controlId.ShiftOpt(
-								webhelp.DirMux{
-									"": webhelp.Exact(renderer.Render(endpoints.Control)),
-									"sample": webhelp.ExactPath(webhelp.RequireMethod("POST",
+								whmux.Dir{
+									"": whmux.Exact(renderer.Render(endpoints.Control)),
+									"sample": whmux.ExactPath(whmux.RequireMethod("POST",
 										renderer.Process(endpoints.NewSample))),
 								},
-								webhelp.ExactPath(webhelp.MethodMux{
+								whmux.ExactPath(whmux.Method{
 									"GET":  ProjectRedirector,
 									"POST": renderer.Process(endpoints.NewControl),
 								}),
 							),
 
 							"control_named": controlName.ShiftOpt(
-								webhelp.DirMux{
-									"sample": webhelp.ExactPath(webhelp.RequireMethod("POST",
+								whmux.Dir{
+									"sample": whmux.ExactPath(whmux.RequireMethod("POST",
 										renderer.Process(endpoints.NewSampleFromName))),
 								},
-								webhelp.RequireGet(ProjectRedirector),
+								whmux.RequireGet(ProjectRedirector),
 							),
 
-							"search": webhelp.RequireMethod("POST",
-								webhelp.ExactPath(renderer.Render(endpoints.Search)),
+							"search": whmux.RequireMethod("POST",
+								whmux.ExactPath(renderer.Render(endpoints.Search)),
 							),
 						},
 
-						webhelp.ExactPath(webhelp.MethodMux{
-							"GET":  webhelp.RedirectHandler("/"),
+						whmux.ExactPath(whmux.Method{
+							"GET":  whredir.RedirectHandler("/"),
 							"POST": renderer.Process(endpoints.NewProject),
 						}),
 					),
 
-					"account": webhelp.DirMux{
-						"apikeys": webhelp.ExactPath(webhelp.MethodMux{
+					"account": whmux.Dir{
+						"apikeys": whmux.ExactPath(whmux.Method{
 							"GET":  renderer.Render(endpoints.APIKeys),
 							"POST": renderer.Process(endpoints.NewAPIKey),
 						}),
 					},
 				}),
-				Overlay: webhelp.DirMux{
+				Overlay: whmux.Dir{
 					"auth": oauth2,
 				}})))
 
@@ -116,9 +119,9 @@ func main() {
 			panic(err)
 		}
 	case "serve":
-		panic(webhelp.ListenAndServe(*listenAddr, routes))
+		panic(whlog.ListenAndServe(*listenAddr, routes))
 	case "routes":
-		webhelp.PrintRoutes(os.Stdout, routes)
+		whroute.PrintRoutes(os.Stdout, routes)
 	default:
 		fmt.Printf("Usage: %s <serve|createdb|routes>\n", os.Args[0])
 	}
